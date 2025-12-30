@@ -1,8 +1,36 @@
-fastapi
-uvicorn
-pdfplumber
-python-docx
-spacy
-sentence-transformers
-scikit-learn
-python-multipart
+# -----------------------------
+# Core Backend
+# -----------------------------
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
+
+# -----------------------------
+# Database (PostgreSQL)
+# -----------------------------
+sqlalchemy==2.0.29
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+
+# -----------------------------
+# Resume Parsing & NLP
+# -----------------------------
+pdfplumber==0.10.4
+pytesseract==0.3.10
+pillow==10.2.0
+
+# -----------------------------
+# Skill Extraction & Matching
+# -----------------------------
+sentence-transformers==2.6.1
+scikit-learn==1.4.1.post1
+numpy==1.26.4
+
+# -----------------------------
+# Azure Blob Storage
+# -----------------------------
+azure-storage-blob==12.19.0
+
+# -----------------------------
+# Utilities
+# -----------------------------
+python-multipart==0.0.9
