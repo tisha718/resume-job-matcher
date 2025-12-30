@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from app.api.resume import router as resume_router
-from app.api.match import router as match_router
+from app.api.match import router as candidate_router
 
 app = FastAPI(title="Smart Resume Screening API")
 
-app.include_router(resume_router, prefix="/resume", tags=["Resume"])
-app.include_router(match_router, prefix="/match", tags=["Matching"])
+# Resume-related endpoints
+app.include_router(resume_router, tags=["Resume"])
 
+# Candidate job matching & applications
+app.include_router(candidate_router)
 
 @app.get("/health")
 def health_check():
