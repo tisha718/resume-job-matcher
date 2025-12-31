@@ -8,7 +8,7 @@ from app.services.skill_extraction import extract_skills
 # -----------------------------
 # Load FREE sentence transformer
 # -----------------------------
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", cache_folder = "models", local_files_only = True)
 
 
 def compute_semantic_similarity(text1: str, text2: str) -> float:
