@@ -3,62 +3,72 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import Resume, Job, Application
-from app.services.matching_service import match_resume_to_job
+from app.services.matching_service import (
+    match_resume_to_job,
+    compute_semantic_score,
+)
 
 router = APIRouter(
     prefix="/api/candidate",
     tags=["Candidate Jobs"]
 )
 
-# ------------------------------------------------------------------
-# 1️⃣ Recommended Jobs
-# ------------------------------------------------------------------
+# ==================================================
+# 1️⃣ RECOMMENDED JOBS (LEAN, UI-FRIENDLY)
+# ==================================================
 @router.get("/recommended-jobs")
 def get_recommended_jobs(
-    user_id: int = Query(..., description="Candidate user id"),
-    resume_id: int = Query(..., description="Resume selected by candidate"),
+    user_id: int = Query(...),
+    resume_id: int = Query(...),
     limit: int = Query(5, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    """
-    Get AI-matched job recommendations for a selected resume.
-    Includes job description for UI cards.
-    """
-
     resume = (
         db.query(Resume)
-        .filter(
-            Resume.id == resume_id,
-            Resume.user_id == user_id
-        )
+        .filter(Resume.id == resume_id, Resume.user_id == user_id)
         .first()
     )
-
     if not resume:
-        raise HTTPException(status_code=404, detail="Resume not found for user")
+        raise HTTPException(status_code=404, detail="Resume not found")
 
-    jobs = db.query(Job).all()
+    # 🔹 Azure semantic scores
+    semantic_scores = compute_semantic_score(resume.parsed_text, top_k=50)
+    if not semantic_scores:
+        return {"recommended_jobs": []}
+
+    jobs = (
+        db.query(Job)
+        .filter(Job.id.in_(semantic_scores.keys()))
+        .all()
+    )
+
     recommendations = []
 
     for job in jobs:
-        result = match_resume_to_job(
+        skill_result = match_resume_to_job(
             resume_text=resume.parsed_text,
             job_description=job.description
         )
 
+        semantic_score = semantic_scores.get(job.id, 0.0)
+
+        fit_score = round(
+            0.6 * skill_result["skill_score"] +
+            0.4 * semantic_score,
+            2
+        )
+
+        # ✅ ONLY what job cards need
         recommendations.append({
             "job_id": job.id,
             "title": job.title,
             "description": job.description,
             "location": job.location,
             "job_type": job.job_type,
-            "fit_score": result["fit_score"],
+            "fit_score": fit_score,
         })
 
-    recommendations.sort(
-        key=lambda x: x["fit_score"],
-        reverse=True
-    )
+    recommendations.sort(key=lambda x: x["fit_score"], reverse=True)
 
     return {
         "user_id": user_id,
@@ -67,9 +77,9 @@ def get_recommended_jobs(
     }
 
 
-# ------------------------------------------------------------------
-# 2️⃣ Skill Analysis (Merged)
-# ------------------------------------------------------------------
+# ==================================================
+# 2️⃣ SKILL ANALYSIS (FULL BREAKDOWN)
+# ==================================================
 @router.get("/jobs/{job_id}/skill-analysis")
 def get_job_skill_analysis(
     job_id: int,
@@ -77,87 +87,90 @@ def get_job_skill_analysis(
     resume_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
-    """
-    Detailed skill analysis for a job against a selected resume.
-    """
-
     resume = (
         db.query(Resume)
-        .filter(
-            Resume.id == resume_id,
-            Resume.user_id == user_id
-        )
+        .filter(Resume.id == resume_id, Resume.user_id == user_id)
         .first()
     )
-
     if not resume:
-        raise HTTPException(status_code=404, detail="Resume not found for user")
+        raise HTTPException(status_code=404, detail="Resume not found")
 
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    result = match_resume_to_job(
+    # Skill-based analysis
+    skill_result = match_resume_to_job(
         resume_text=resume.parsed_text,
         job_description=job.description
     )
 
+    # Semantic score ONLY for this job
+    semantic_scores = compute_semantic_score(resume.parsed_text, top_k=20)
+    semantic_score = semantic_scores.get(job_id, 0.0)
+
+    fit_score = round(
+        0.6 * skill_result["skill_score"] +
+        0.4 * semantic_score,
+        2
+    )
+
+    # ✅ FULL ANALYSIS (as you demanded)
     return {
         "job_id": job.id,
         "title": job.title,
-        "description": job.description,
-        "fit_score": result["fit_score"],
-        "skill_score": result["skill_score"],
-        "semantic_score": result["semantic_score"],
-        "matched_skills": result["matched_skills"],
-        "missing_skills": result["missing_skills"],
+        "fit_score": fit_score,
+        "skill_score": skill_result["skill_score"],
+        "semantic_score": semantic_score,
+        "matched_skills": skill_result["matched_skills"],
+        "missing_skills": skill_result["missing_skills"],
     }
 
 
-# ------------------------------------------------------------------
-# 3️⃣ Apply for Job (REAL DB INSERT)
-# ------------------------------------------------------------------
+# ==================================================
+# 3️⃣ APPLY FOR JOB (SNAPSHOT STORED)
+# ==================================================
 @router.post("/jobs/{job_id}/apply")
 def apply_for_job(
     job_id: int,
     user_id: int = Query(...),
-    resume_id: int = Query(...),  # used ONLY for matching
+    resume_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
-    """
-    Apply for a job.
-    Stores AI evaluation snapshot in applications table.
-    """
+    resume = (
+        db.query(Resume)
+        .filter(Resume.id == resume_id, Resume.user_id == user_id)
+        .first()
+    )
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found")
 
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    resume = (
-        db.query(Resume)
-        .filter(
-            Resume.id == resume_id,
-            Resume.user_id == user_id
-        )
-        .first()
-    )
-    if not resume:
-        raise HTTPException(status_code=404, detail="Resume not found for user")
-
-    # Run AI matching
-    result = match_resume_to_job(
+    skill_result = match_resume_to_job(
         resume_text=resume.parsed_text,
         job_description=job.description
+    )
+
+    semantic_scores = compute_semantic_score(resume.parsed_text, top_k=20)
+    semantic_score = semantic_scores.get(job_id, 0.0)
+
+    fit_score = round(
+        0.6 * skill_result["skill_score"] +
+        0.4 * semantic_score,
+        2
     )
 
     application = Application(
         user_id=user_id,
         job_id=job_id,
-        fit_score=result["fit_score"],
-        skill_score=result["skill_score"],
-        semantic_score=result["semantic_score"],
-        matched_skills=result["matched_skills"],
-        missing_skills=result["missing_skills"],
+        fit_score=fit_score,
+        skill_score=skill_result["skill_score"],
+        semantic_score=semantic_score,
+        matched_skills=skill_result["matched_skills"],
+        missing_skills=skill_result["missing_skills"],
         application_status="applied"
     )
 
@@ -168,6 +181,4 @@ def apply_for_job(
     return {
         "message": "Application submitted successfully",
         "application_id": application.id,
-        "job_id": job_id,
-        "fit_score": application.fit_score
     }

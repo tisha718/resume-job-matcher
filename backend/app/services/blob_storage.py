@@ -1,6 +1,7 @@
 import os
 import uuid
 from dotenv import load_dotenv
+from urllib.parse import urlparse
 from azure.storage.blob import BlobServiceClient
 
 # Load environment variables
@@ -24,8 +25,12 @@ if not container_name:
     )
 
 # Create Blob service client
-blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-container_client = blob_service_client.get_container_client(container_name)
+blob_service_client = BlobServiceClient.from_connection_string(
+    connection_string
+)
+container_client = blob_service_client.get_container_client(
+    container_name
+)
 
 
 def upload_resume_to_blob(file):
@@ -39,3 +44,19 @@ def upload_resume_to_blob(file):
     blob_client.upload_blob(file.file, overwrite=True)
 
     return blob_client.url
+
+
+def delete_blob(blob_url: str):
+    """
+    Delete a blob using its full Azure Blob URL.
+    """
+
+    # Parse URL → extract blob name
+    parsed = urlparse(blob_url)
+
+    # Example path: /resumes/uuid_filename.pdf
+    blob_name = parsed.path.split(f"/{container_name}/")[-1]
+
+    blob_client = container_client.get_blob_client(blob_name)
+
+    blob_client.delete_blob()
