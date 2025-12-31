@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     JSON,
+    Float,
 )
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
@@ -20,14 +21,16 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(Text, nullable=False)
-    role = Column(String(20), nullable=False)  # candidate / recruiter
+    role = Column(String(20), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
 
 # --------------------------------------------------
-# RESUMES (REAL DATA ONLY)
+# RESUMES
 # --------------------------------------------------
 class Resume(Base):
     __tablename__ = "resumes"
@@ -36,18 +39,16 @@ class Resume(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     filename = Column(String(255), nullable=False)
+    file_path = Column(Text, nullable=False)   # Azure Blob URL
 
-    # Azure Blob URL
-    file_path = Column(Text, nullable=False)
-
-    parsed_text = Column(Text, nullable=True)
-    skills_json = Column(JSON, nullable=True)
+    parsed_text = Column(Text)
+    skills_json = Column(JSON)
 
     created_at = Column(DateTime, server_default=func.now())
 
 
 # --------------------------------------------------
-# JOBS (USED FOR MATCHING)
+# JOBS
 # --------------------------------------------------
 class Job(Base):
     __tablename__ = "jobs"
@@ -58,7 +59,29 @@ class Job(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
 
-    location = Column(String(255), nullable=True)
-    job_type = Column(String(50), nullable=True)
+    location = Column(String(255))
+    job_type = Column(String(50))
 
     created_at = Column(DateTime, server_default=func.now())
+
+
+# --------------------------------------------------
+# APPLICATIONS (NO resume_id ❌)
+# --------------------------------------------------
+class Application(Base):
+    __tablename__ = "applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
+
+    fit_score = Column(Float, nullable=False)
+    skill_score = Column(Float, nullable=False)
+    semantic_score = Column(Float, nullable=False)
+
+    matched_skills = Column(JSON)
+    missing_skills = Column(JSON)
+
+    application_status = Column(String(50), default="applied")
+    applied_at = Column(DateTime, server_default=func.now())
