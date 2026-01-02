@@ -48,15 +48,24 @@ def upload_resume_to_blob(file):
 
 def delete_blob(blob_url: str):
     """
-    Delete a blob using its full Azure Blob URL.
+    Safely delete a blob using its full Azure Blob URL.
+    Idempotent: no error if blob is already missing.
     """
+    try:
+        # Parse URL → extract blob name
+        parsed = urlparse(blob_url)
 
-    # Parse URL → extract blob name
-    parsed = urlparse(blob_url)
+        # Example path: /resumes/uuid_filename.pdf
+        blob_name = parsed.path.split(f"/{container_name}/")[-1]
 
-    # Example path: /resumes/uuid_filename.pdf
-    blob_name = parsed.path.split(f"/{container_name}/")[-1]
+        blob_client = container_client.get_blob_client(blob_name)
 
-    blob_client = container_client.get_blob_client(blob_name)
+        # ✅ IMPORTANT: check existence first
+        if blob_client.exists():
+            blob_client.delete_blob()
+        else:
+            # Blob already deleted → safe to ignore
+            pass
 
-    blob_client.delete_blob()
+    except Exception as e:
+        raise RuntimeError(str(e))
