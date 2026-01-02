@@ -9,6 +9,23 @@ router = APIRouter(
     tags=["Job Management"]
 )
 
+@router.get("/jobs")
+async def get_jobs(
+    db: Session = Depends(get_db),
+    # limit: int = Query(20, ge=1, le=100, description="Number of jobs to return"),
+    # offset: int = Query(0, ge=0, description="Number of jobs to skip (for pagination)")
+):
+    
+    jobs = (
+        db.query(Job)
+        .order_by(Job.id.desc())  # or Job.created_at.desc() if you have it
+        # .limit(limit)
+        # .offset(offset)
+        .all()
+    )
+
+    return jobs
+
 @router.post("/jobs/new")
 async def create_job(
     recruiter_id: int=Query(...),
