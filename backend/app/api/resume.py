@@ -3,7 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.services.text_extraction import extract_text
 from app.services.skill_extraction import extract_skills
-from app.services.blob_storage import upload_resume_to_blob
+from app.services.blob_storage import (
+    upload_resume_to_blob,
+    delete_blob
+)
 
 from app.db.database import get_db
 from app.db.models import Resume
@@ -140,8 +143,7 @@ def delete_candidate_resume(
     db: Session = Depends(get_db)
 ):
     """
-    Delete resume record from DB.
-    (Blob deletion will be added later.)
+    Delete resume from DB + Azure Blob Storage.
     """
 
     resume = (
@@ -159,6 +161,16 @@ def delete_candidate_resume(
             detail="Resume not found for this user"
         )
 
+    # 🔥 Delete blob from Azure
+    try:
+        delete_blob(resume.file_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete resume file from storage: {str(e)}"
+        )
+
+    # 🗑️ Delete DB record
     db.delete(resume)
     db.commit()
 

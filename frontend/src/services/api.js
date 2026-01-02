@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api'; // Change this to your FastAPI backend URL
+const API_BASE_URL = 'http://localhost:8001'; // Change this to your FastAPI backend URL
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -28,6 +28,30 @@ export const authAPI = {
   signup: (data) => api.post('/auth/signup', data),
   login: (data) => api.post('/auth/login', data),
   googleAuth: (token) => api.post('/auth/google', { token }),
+};
+
+// Resume Upload API
+export const resumeAPI = {
+  // Upload resume to Azure Blob + DB
+  uploadResume: async (file, userId) => {
+    const formData = new FormData();
+    formData.append('resume', file);
+    formData.append('user_id', userId);
+    
+    return api.post('/api/candidate/upload-resume', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  
+  // Get all resumes for user
+  getAllResumes: (userId) => {
+    return api.get(`/api/candidate/resumes?user_id=${userId}`);
+  },
+  
+  // Delete resume
+  deleteResume: (resumeId, userId) => {
+    return api.delete(`/api/candidate/resume/${resumeId}?user_id=${userId}`);
+  }
 };
 
 // Candidate APIs
