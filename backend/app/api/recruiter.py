@@ -9,7 +9,7 @@ router = APIRouter(
     tags=["Job Management"]
 )
 
-@router.post("/jobs")
+@router.post("/jobs/new")
 async def create_job(
     recruiter_id: int=Query(...),
     title: str=Query(...),
