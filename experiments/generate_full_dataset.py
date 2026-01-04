@@ -14,9 +14,10 @@ START_DATE = datetime(2024, 1, 1)
 
 APPLICATION_STATUSES = [
     "applied",
-    "screened",
+    "shortlisted",
     "interviewed",
-    "offered"
+    "offered",
+    "rejected"
 ]
 
 FIRST_NAMES = [
@@ -28,6 +29,14 @@ LAST_NAMES = [
     "Sharma", "Verma", "Singh", "Patel", "Gupta",
     "Mehta", "Kumar", "Agarwal", "Jain", "Malhotra"
 ]
+
+COMPANIES = [
+    "Google", "Microsoft", "Amazon", "Flipkart",
+    "Infosys", "TCS", "Accenture", "Deloitte",
+    "PwC", "Uber"
+]
+
+JOB_STATUSES = ["active", "closed"]
 
 # ================= PATH =================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -132,16 +141,17 @@ for _ in range(NUM_JOBS):
         job_id,
         recruiter_id,
         title,
+        random.choice(COMPANIES),        
         job_description_templates[title],
         random.choice(locations),
         random.choice(job_types),
+        random.choice(JOB_STATUSES),     
         rand_date()
     ])
     job_id += 1
 
 
 # ================= APPLICATIONS =================
-# Role → skills mapping (ontology-aligned, clean)
 ROLE_SKILLS = {
     "Data Analyst": [
         "python", "sql", "pandas", "numpy",
@@ -235,7 +245,17 @@ write_csv(
 
 write_csv(
     "jobs.csv",
-    ["id", "recruiter_id", "title", "description", "location", "job_type", "created_at"],
+    [
+        "id",
+        "recruiter_id",
+        "title",
+        "company",
+        "description",
+        "location",
+        "job_type",
+        "job_status",
+        "created_at"
+    ],
     jobs
 )
 

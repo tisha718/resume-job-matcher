@@ -59,6 +59,9 @@ class Job(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
 
+    company = Column(String(255), nullable=True)    
+    job_status = Column(String(50), nullable=False)
+
     location = Column(String(255))
     job_type = Column(String(50))
 

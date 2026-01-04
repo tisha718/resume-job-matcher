@@ -61,10 +61,12 @@ def get_recommended_jobs(
         # ✅ ONLY what job cards need
         recommendations.append({
             "job_id": job.id,
+            "company": job.company,
             "title": job.title,
             "description": job.description,
             "location": job.location,
             "job_type": job.job_type,
+            "job status": job.job_status,
             "fit_score": fit_score,
         })
 
