@@ -35,7 +35,7 @@ async def read_users(job_id: int, db: Session = Depends(get_db)):
     return job
 
 
-@router.put("/{job_id}", summary="Update job posting")
+@router.put("/jobs/{job_id}", summary="Update job posting")
 async def update_job(
     job_id: int = Path(..., gt=0, description="Job ID"),
 
@@ -55,7 +55,7 @@ async def update_job(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found")
 
     # Allowed sets
-    allowed_job_types = {"Full-time", "Contract", "Part-Time", "Internship"}
+    allowed_job_types = {"Full-time", "Contract", "Part-time", "Internship"}
     allowed_job_statuses = {"active", "closed"}
 
     # --- Validation ---
