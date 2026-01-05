@@ -28,13 +28,25 @@ async def get_jobs(
     return jobs
 
 @router.get("/jobs/{job_id}")  
-async def read_users(job_id: int, db: Session = Depends(get_db)):
+async def get_job_by_job_id(job_id: int, db: Session = Depends(get_db)):
     job = db.get(Job, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
     return job
 
+@router.get("/jobs/by-recruiter/{recruiter_id}")  
+async def get_job_by_recruiter_id(recruiter_id: int, db: Session = Depends(get_db)):
+    job = (
+        db.query(Job)
+        .filter(Job.recruiter_id == recruiter_id)
+        .all()
+    )
+
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {recruiter_id} not found")
+
+    return job
 
 @router.put("/jobs/{job_id}", summary="Update job posting")
 async def update_job(
