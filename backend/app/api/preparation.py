@@ -1,20 +1,25 @@
-from fastapi import FastAPI, Form, HTTPException
+# app/api/preparation.py
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from enum import Enum
+from sqlalchemy.orm import Session
 
-from app.jobs import get_job_description
-from app.prompt import build_prompt
-from app.ai import generate_questions
+from app.db.database import get_db
+from app.db.models import Job
+from app.core.prompts import build_prompt
+from app.services.question_generator import generate_interview_questions
 
-app = FastAPI(title="Interview Question Generator")
+router = APIRouter(
+    prefix="/api/candidate",
+    tags=["Interview Preparation"]
+)
+
 
 class DifficultyLevel(str, Enum):
     easy = "easy"
     medium = "medium"
     hard = "hard"
 
-@app.get("/")
-def home():
-    return {"message": "API is running successfully"}
 
 def extract_questions(section_text: str):
     lines = section_text.splitlines()
@@ -29,19 +34,27 @@ def extract_questions(section_text: str):
 
     return questions
 
+
 def number_questions(questions: list):
     return [f"{i + 1}. {q}" for i, q in enumerate(questions)]
 
-@app.post("/generate-questions")
-def generate_questions_api(
-    id: int = Form(...),
-    difficulty: DifficultyLevel = Form(...)
+
+@router.get("/jobs/{job_id}/prepare")
+def prepare_for_job(
+    job_id: int,
+    difficulty: DifficultyLevel = Query(DifficultyLevel.medium),
+    db: Session = Depends(get_db),
 ):
-    description = get_job_description(id)
+    """
+    Generate interview questions for a job using Azure Foundry (DeepSeek)
+    """
 
-    prompt = build_prompt(description, difficulty.value)
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
-    raw_output = generate_questions(prompt)
+    prompt = build_prompt(job.description, difficulty.value)
+    raw_output = generate_interview_questions(prompt)
 
     try:
         tech_part = raw_output.split("TECHNICAL:")[1].split("BEHAVIORAL:")[0]
@@ -49,7 +62,7 @@ def generate_questions_api(
     except IndexError:
         raise HTTPException(
             status_code=500,
-            detail="AI response format invalid. Expected TECHNICAL and BEHAVIORAL sections."
+            detail="AI response format invalid"
         )
 
     technical_questions = extract_questions(tech_part)
@@ -58,12 +71,11 @@ def generate_questions_api(
     if len(technical_questions) < 10 or len(behavioral_questions) < 5:
         raise HTTPException(
             status_code=500,
-            detail="AI did not generate the required number of questions"
+            detail="AI did not generate required number of questions"
         )
 
-    #  Return NUMBERED questions
     return {
-        "id": id,
+        "job_id": job_id,
         "difficulty": difficulty.value,
         "technical_questions": number_questions(technical_questions[:10]),
         "behavioral_questions": number_questions(behavioral_questions[:5])

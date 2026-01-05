@@ -1,20 +1,17 @@
+# app/services/question_generator.py
+
 import os
-from dotenv import load_dotenv
 from openai import AzureOpenAI
 
-# Load environment variables from .env
-load_dotenv()
-
-# Create Azure OpenAI client
 client = AzureOpenAI(
     api_key=os.getenv("AZURE_API_KEY"),
     api_version=os.getenv("AZURE_API_VERSION"),
     azure_endpoint=os.getenv("AZURE_ENDPOINT")
 )
 
-def generate_questions(prompt: str) -> str:
+def generate_interview_questions(prompt: str) -> str:
     """
-    Sends prompt to Azure DeepSeek and returns generated questions.
+    Calls Azure DeepSeek (Foundry) and returns raw text output
     """
     try:
         response = client.chat.completions.create(
@@ -36,4 +33,4 @@ def generate_questions(prompt: str) -> str:
         return response.choices[0].message.content
 
     except Exception as e:
-        raise RuntimeError(f"Error from Azure OpenAI: {str(e)}")
+        raise RuntimeError(f"Azure OpenAI error: {str(e)}")

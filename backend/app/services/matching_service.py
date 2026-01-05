@@ -9,33 +9,30 @@ from app.services.azure_search_client import search_client
 # Azure AI Search semantic similarity
 # --------------------------------------------------
 def compute_semantic_score(resume_text: str, top_k: int = 10) -> dict:
-    """
-    Query Azure AI Search using resume text.
-    Returns a mapping: { job_id (int): semantic_score (0–100) }
-    """
+    safe_resume_text = resume_text[:1500]
 
-    results = search_client.search(
-        search_text=resume_text,
+    results = list(search_client.search(
+        search_text=safe_resume_text,
         top=top_k,
         include_total_count=False
-    )
+    ))
+
+    if not results:
+        return {}
+
+    # 🔑 Normalize against the best match
+    max_raw_score = max(r["@search.score"] for r in results)
 
     semantic_scores = {}
 
     for r in results:
-        # Azure Search key field is STRING → convert to int
         job_id = int(r["job_id"])
-
-        # Azure @search.score is usually ~0–10
         raw_score = r["@search.score"]
 
-        # Normalize to 0–100
-        normalized_score = min(raw_score * 10, 100)
-
+        normalized_score = (raw_score / max_raw_score) * 100
         semantic_scores[job_id] = round(normalized_score, 2)
 
     return semantic_scores
-
 
 # --------------------------------------------------
 # Skill-only Resume ↔ Job Matching
@@ -91,9 +88,6 @@ def recommend_jobs_for_resume(
     if not resume:
         raise ValueError("Resume not found for user")
 
-    # --------------------------------------------------
-    # Step 1: Semantic scores from Azure AI Search
-    # --------------------------------------------------
     semantic_scores = compute_semantic_score(
         resume.parsed_text,
         top_k=50
@@ -102,9 +96,6 @@ def recommend_jobs_for_resume(
     if not semantic_scores:
         return []
 
-    # --------------------------------------------------
-    # Step 2: Fetch only semantically relevant jobs
-    # --------------------------------------------------
     jobs = (
         db.query(Job)
         .filter(Job.id.in_(semantic_scores.keys()))
@@ -121,7 +112,6 @@ def recommend_jobs_for_resume(
 
         semantic_score = semantic_scores.get(job.id, 0.0)
 
-        # Final hybrid score
         fit_score = round(
             0.6 * skill_result["skill_score"] +
             0.4 * semantic_score,

@@ -164,7 +164,7 @@ def delete_candidate_resume(
             detail="Resume not found for this user"
         )
 
-    # 🔥 Delete blob from Azure
+    # 🔥 Delete blob FIRST (safe + idempotent now)
     try:
         delete_blob(resume.file_path)
     except Exception as e:
@@ -173,7 +173,7 @@ def delete_candidate_resume(
             detail=f"Failed to delete resume file from storage: {str(e)}"
         )
 
-    #  Delete DB record
+    # 🗑️ Delete DB record
     db.delete(resume)
     db.commit()
 

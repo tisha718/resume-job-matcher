@@ -1,3 +1,5 @@
+# app/core/prompts.py
+
 def build_prompt(job_description: str, difficulty: str) -> str:
     return f"""
 You are a professional interviewer.
