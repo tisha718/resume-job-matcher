@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -25,6 +25,14 @@ async def get_jobs(
     )
 
     return jobs
+
+@router.get("/jobs/{job_id}")  
+async def read_users(job_id: int, db: Session = Depends(get_db)):
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    return job
 
 @router.post("/jobs/new")
 async def create_job(
