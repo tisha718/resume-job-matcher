@@ -39,16 +39,20 @@ async def create_job(
     recruiter_id: int=Query(...),
     title: str=Query(...),
     description: str=Query(...),
+    company: str=Query(...),
     location: str=Query(...),
     job_type: str=Query(...),
+    job_status: str=Query(...),
     db: Session = Depends(get_db)
 ):
     job=Job(
         recruiter_id = recruiter_id,
         title = title,
         description = description,
+        company=company,
         location = location,
-        job_type = job_type
+        job_type = job_type,
+        job_status=job_status
     )
 
     db.add(job)
