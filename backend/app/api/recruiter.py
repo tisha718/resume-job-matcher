@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Path, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.db.database import get_db
 from app.db.models import Job
@@ -150,3 +151,35 @@ async def create_job(
         "message": "Job created successfully",
         "job_id": job.id,
     }
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a job posting")
+async def delete_job(
+    job_id: int = Path(..., gt=0, description="Job ID to delete"),
+    db: Session = Depends(get_db),
+    # current_recruiter = Depends(get_current_recruiter)  # ← uncomment when you have auth
+):
+    job = db.get(Job, job_id)
+    if job is None:
+        # No resource to delete
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found")
+
+    # Ownership (optional)
+    # assert_recruiter_owns_job(job, current_recruiter.id)
+
+    try:
+        db.delete(job)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Likely due to FK constraint (applications referencing this job)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete job due to existing references (e.g., applications). Consider closing the job instead."
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete job due to a database error")
+
+    # 204 No Content (empty body)
+    return
