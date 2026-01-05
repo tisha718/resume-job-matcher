@@ -3,6 +3,7 @@ import uuid
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 from azure.storage.blob import BlobServiceClient
+from azure.core.exceptions import ResourceNotFoundError
 
 # Load environment variables
 load_dotenv()
@@ -11,7 +12,7 @@ load_dotenv()
 connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 container_name = os.getenv("AZURE_CONTAINER_NAME")
 
-# Safety checks (VERY IMPORTANT)
+# Safety checks
 if not connection_string:
     raise RuntimeError(
         "AZURE_STORAGE_CONNECTION_STRING is not set. "
@@ -49,28 +50,31 @@ def upload_resume_to_blob(file):
 def delete_blob(blob_url: str):
     """
     Safely delete a blob using its full Azure Blob URL.
-    Idempotent: no error if blob is already missing.
+    Idempotent:
+    - If blob exists → delete
+    - If blob does not exist → ignore
     """
+
+    if not blob_url:
+        return
+
+    parsed = urlparse(blob_url)
+
+    # Extract blob name safely
+    path = parsed.path.lstrip("/")
+    if path.startswith(f"{container_name}/"):
+        blob_name = path[len(container_name) + 1 :]
+    else:
+        blob_name = path
+
+    blob_client = container_client.get_blob_client(blob_name)
+
     try:
-        # Parse URL → extract blob name
-        parsed = urlparse(blob_url)
+        blob_client.delete_blob()
+    except ResourceNotFoundError:
+        # Blob already deleted or never existed → SAFE
+        return
 
-        # Example path: /resumes/uuid_filename.pdf
-        blob_name = parsed.path.split(f"/{container_name}/")[-1]
-
-        blob_client = container_client.get_blob_client(blob_name)
-
-        # ✅ IMPORTANT: check existence first
-        if blob_client.exists():
-            blob_client.delete_blob()
-        else:
-            # Blob already deleted → safe to ignore
-            pass
-
-    except Exception as e:
-        raise RuntimeError(str(e))
-    
-    blob_client.delete_blob()
 
 def download_resume_from_blob(blob_url: str) -> bytes:
     """
@@ -79,11 +83,13 @@ def download_resume_from_blob(blob_url: str) -> bytes:
     Returns the file content as bytes.
     """
 
-    # Parse URL → extract blob name
     parsed = urlparse(blob_url)
 
-    # Example path: /resumes/uuid_filename.pdf
-    blob_name = parsed.path.split(f"/{container_name}/")[-1]
+    path = parsed.path.lstrip("/")
+    if path.startswith(f"{container_name}/"):
+        blob_name = path[len(container_name) + 1 :]
+    else:
+        blob_name = path
 
     blob_client = container_client.get_blob_client(blob_name)
 

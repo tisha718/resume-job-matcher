@@ -26,7 +26,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
     response = { 
         "total_applications": total,
         "applied": 0,
-        "screened": 0,
+        "shortlisted": 0,
         "interviewed": 0,
         "offered": 0,
         "rejected": 0
@@ -65,7 +65,7 @@ def get_particular_job_application_summary(
         "job_id": job_id,
         "total_applications": total,
         "applied": 0,
-        "screened": 0,
+        "shortlisted": 0,
         "interviewed": 0,
         "offered": 0,
         "rejected": 0
