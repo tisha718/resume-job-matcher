@@ -1,61 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { resumeAPI } from '../../services/api';
 import { 
-  Upload, FileText, Briefcase, TrendingUp, LogOut, User, Star
+  Upload, FileText, Briefcase, TrendingUp, Star
 } from 'lucide-react';
 
+import DashboardNavbar from '../common/DashboardNavbar';
+import StatCard from '../common/StatCard';
 import ResumeUpload from './ResumeUpload';
 import MyProfile from './MyProfile';
 import JobRecommendations from './JobRecommendations';
 
 const CandidateDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [uploadedResumes, setUploadedResumes] = useState([]);
-  const [selectedResumeId, setSelectedResumeId] = useState(null);
-
-  const { user, logout } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
+  const [resumeCount, setResumeCount] = useState(0);
 
-  // Load resumes from localStorage on mount
+  // Initialize history state on mount
   useEffect(() => {
-    const savedResumes = localStorage.getItem('uploadedResumes');
-    if (savedResumes) {
-      const resumes = JSON.parse(savedResumes);
-      setUploadedResumes(resumes);
-      if (resumes.length > 0 && !selectedResumeId) {
-        setSelectedResumeId(resumes[0].id);
-      }
+    if (!window.history.state?.initialized) {
+      window.history.replaceState(
+        { initialized: true, tab: activeTab, page: 'candidate-dashboard' }, 
+        '', 
+        '/candidate-dashboard'
+      );
     }
   }, []);
 
-  // Save resumes to localStorage whenever they change
   useEffect(() => {
-    if (uploadedResumes.length > 0) {
-      localStorage.setItem('uploadedResumes', JSON.stringify(uploadedResumes));
-    } else {
-      localStorage.removeItem('uploadedResumes');
+    fetchResumeCount();
+  }, []);
+
+  // Handle tab changes - push to history
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    window.history.pushState(
+      { tab: newTab, page: 'candidate-dashboard' }, 
+      '', 
+      '/candidate-dashboard'
+    );
+  };
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state?.page === 'candidate-dashboard') {
+        if (event.state?.tab) {
+          setActiveTab(event.state.tab);
+        }
+      } else {
+        navigate(-1);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
+  const fetchResumeCount = async () => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = userData.id || userData.user_id || 1;
+      
+      const response = await resumeAPI.getAllResumes(userId);
+      setResumeCount(response.data.resumes?.length || 0);
+    } catch (err) {
+      console.error('Error fetching resume count:', err);
     }
-  }, [uploadedResumes]);
+  };
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
-  const handleResumeUploaded = (newResume) => {
-    setUploadedResumes(prev => [newResume, ...prev]);
-    setSelectedResumeId(newResume.id);
-    setActiveTab('profile');
+  const handleResumeUploaded = () => {
+    fetchResumeCount();
   };
 
-  const handleDeleteResume = (resumeId) => {
-    const updatedResumes = uploadedResumes.filter(r => r.id !== resumeId);
-    setUploadedResumes(updatedResumes);
-    
-    if (selectedResumeId === resumeId) {
-      setSelectedResumeId(updatedResumes.length > 0 ? updatedResumes[0].id : null);
-    }
+  const handleResumeDeleted = () => {
+    fetchResumeCount();
+  };
+
+  const handleNavigateToJobs = () => {
+    handleTabChange('jobs');
+  };
+
+  const handleNavigateToProfile = () => {
+    handleTabChange('profile');
   };
 
   const mockJobs = [
@@ -66,33 +102,17 @@ const CandidateDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Bar */}
-      <div className="bg-blue-600 text-white py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-              <User className="w-7 h-7 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">Welcome back, {user?.name || 'User'}!</h1>
-              <p className="text-blue-100 text-sm">Candidate Dashboard</p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </div>
+      <DashboardNavbar 
+        userType="candidate"
+        userName={user?.name || 'User'}
+        onLogout={handleLogout}
+      />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-4 mb-8">
           <button
-            onClick={() => setActiveTab('overview')}
+            onClick={() => handleTabChange('overview')}
             className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === 'overview'
                 ? 'bg-white text-blue-600 shadow-md'
@@ -103,7 +123,7 @@ const CandidateDashboard = () => {
             <span>Overview</span>
           </button>
           <button
-            onClick={() => setActiveTab('upload')}
+            onClick={() => handleTabChange('upload')}
             className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === 'upload'
                 ? 'bg-white text-blue-600 shadow-md'
@@ -114,18 +134,7 @@ const CandidateDashboard = () => {
             <span>Upload Resume</span>
           </button>
           <button
-            onClick={() => setActiveTab('profile')}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
-              activeTab === 'profile'
-                ? 'bg-white text-blue-600 shadow-md'
-                : 'bg-white text-gray-600 hover:shadow-md'
-            }`}
-          >
-            <FileText className="w-5 h-5" />
-            <span>My Profile</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('jobs')}
+            onClick={() => handleTabChange('jobs')}
             className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === 'jobs'
                 ? 'bg-white text-blue-600 shadow-md'
@@ -135,63 +144,58 @@ const CandidateDashboard = () => {
             <Briefcase className="w-5 h-5" />
             <span>Job Matches</span>
           </button>
+          <button
+            onClick={() => handleTabChange('profile')}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'profile'
+                ? 'bg-white text-blue-600 shadow-md'
+                : 'bg-white text-gray-600 hover:shadow-md'
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span>My Profile</span>
+          </button>
         </div>
 
         {/* Content Area */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl shadow-sm p-6 transform hover:scale-105 transition-transform">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Uploaded Resumes</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{uploadedResumes.length}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 transform hover:scale-105 transition-transform">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Job Matches</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{mockJobs.length}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <Briefcase className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 transform hover:scale-105 transition-transform">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Avg Match Score</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">85%</p>
-                  </div>
-                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                    <Star className="w-6 h-6 text-purple-600" />
-                  </div>
-                </div>
-              </div>
+              <StatCard 
+                title="Uploaded Resumes" 
+                value={resumeCount} 
+                icon={FileText}
+                bgColor="bg-blue-100"
+                iconColor="text-blue-600"
+                onClick={handleNavigateToProfile}
+              />
+              <StatCard 
+                title="Job Matches" 
+                value={mockJobs.length} 
+                icon={Briefcase}
+                bgColor="bg-green-100"
+                iconColor="text-green-600"
+              />
+              <StatCard 
+                title="Avg Match Score" 
+                value="85%" 
+                icon={Star}
+                bgColor="bg-purple-100"
+                iconColor="text-purple-600"
+              />
             </div>
           </div>
         )}
 
         {activeTab === 'upload' && (
-          <ResumeUpload onResumeUploaded={handleResumeUploaded} />
+          <ResumeUpload 
+            onResumeUploaded={handleResumeUploaded} 
+            onNavigateToJobs={handleNavigateToJobs}
+          />
         )}
 
         {activeTab === 'profile' && (
-          <MyProfile
-            uploadedResumes={uploadedResumes}
-            selectedResumeId={selectedResumeId}
-            onSelectResume={setSelectedResumeId}
-            onDeleteResume={handleDeleteResume}
-            onNavigateToUpload={() => setActiveTab('upload')}
-          />
+          <MyProfile onDeleteResume={handleResumeDeleted} />
         )}
 
         {activeTab === 'jobs' && <JobRecommendations />}
