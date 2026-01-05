@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, BookOpen, Brain, CheckCircle, Lightbulb, Sparkles, Zap, Settings } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, BookOpen, Brain, CheckCircle, Lightbulb, Sparkles, Zap, AlertCircle } from 'lucide-react';
+import { candidateAPI } from '../../services/api';
 
 const InterviewPrep = ({ selectedJob, onClose }) => {
   const [step, setStep] = useState('configure'); // 'configure' or 'questions'
   const [difficulty, setDifficulty] = useState('');
-  const [numQuestions, setNumQuestions] = useState('5');
   const [generating, setGenerating] = useState(false);
   const [interviewData, setInterviewData] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Generate questions (will be replaced with DeepSeek AI API call)
+  // Generate questions using real API
   const generateQuestions = async () => {
     if (!difficulty) {
       alert('Please select a difficulty level');
@@ -16,47 +17,37 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
     }
 
     setGenerating(true);
+    setError(null);
     
     try {
-    
-      // Mock API call - simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the real API endpoint
+      const response = await candidateAPI.generateInterviewQuestions(
+        selectedJob.job_id, 
+        difficulty
+      );
       
-      // Mock data (replace with actual API response)
-      setInterviewData(getMockQuestions());
+      // Format the response to match our UI structure
+      const formattedData = {
+        technical: response.data.technical_questions.map((q, index) => ({
+          question: q,
+          difficulty: difficulty,
+          number: index + 1
+        })),
+        behavioral: response.data.behavioral_questions.map((q, index) => ({
+          question: q,
+          framework: "STAR Method",
+          number: index + 1
+        }))
+      };
+      
+      setInterviewData(formattedData);
       setStep('questions');
     } catch (err) {
       console.error('Error generating questions:', err);
-      alert('Failed to generate questions. Please try again.');
+      setError(err.response?.data?.detail || 'Failed to generate questions. Please try again.');
     } finally {
       setGenerating(false);
     }
-  };
-
-
-  const getMockQuestions = () => {
-    const questionCount = parseInt(numQuestions);
-    const technical = [];
-    const behavioral = [];
-    
-    // Generate technical questions based on job skills
-    for (let i = 0; i < Math.ceil(questionCount * 0.6); i++) {
-      technical.push({
-        question: `Technical question ${i + 1} about ${selectedJob.skills[i % selectedJob.skills.length]} for ${selectedJob.title}?`,
-        difficulty: difficulty,
-        topic: selectedJob.skills[i % selectedJob.skills.length]
-      });
-    }
-    
-    // Generate behavioral questions
-    for (let i = 0; i < Math.floor(questionCount * 0.4); i++) {
-      behavioral.push({
-        question: `Behavioral question ${i + 1}: Describe a situation relevant to ${selectedJob.title} role?`,
-        framework: "STAR Method"
-      });
-    }
-    
-    return { technical, behavioral };
   };
 
   const studyGuide = {
@@ -64,12 +55,11 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
       "Your resume - be ready to explain every project and technology",
       `${selectedJob.company}'s products, mission, and recent news`,
       "Your salary expectations and career goals",
-  
       "Your availability for follow-ups"
     ],
     dayBefore: [
       "Review your resume and practice explaining projects",
-      "Questions to ask the interviewer",
+      "Prepare questions to ask the interviewer",
       "Test your equipment (camera, mic, internet)",
       "Get a good night's sleep"
     ],
@@ -112,11 +102,16 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
       {/* Configuration Step */}
       {step === 'configure' && (
         <>
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2 text-red-700">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
 
           {/* Configuration Options */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-       
-
             <div className="space-y-6">
               {/* Difficulty Selection - MANDATORY */}
               <div>
@@ -135,10 +130,7 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
                   <option value="Medium">Medium - Intermediate level questions</option>
                   <option value="Hard">Hard - Advanced technical questions</option>
                 </select>
-             
               </div>
-
- 
 
               {/* Generate Button */}
               <button
@@ -153,7 +145,7 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
                 {generating ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Generating Questions with AI...</span>
+                    <span>Generating Questions with DeepSeek AI...</span>
                   </>
                 ) : (
                   <>
@@ -162,12 +154,17 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
                   </>
                 )}
               </button>
-              
-              
             </div>
           </div>
 
-          
+          {/* Info Box */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start space-x-3">
+            <Sparkles className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-800">
+              <p className="font-semibold mb-1">AI-Powered Questions</p>
+              <p>Our system uses DeepSeek AI to generate customized interview questions based on the job requirements and your selected difficulty level.</p>
+            </div>
+          </div>
         </>
       )}
 
@@ -189,6 +186,16 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
               </span>
             </div>
 
+            <button
+              onClick={() => {
+                setStep('configure');
+                setInterviewData(null);
+                setDifficulty('');
+              }}
+              className="px-4 py-2 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+            >
+              Generate New Questions
+            </button>
           </div>
 
           {/* Technical Questions */}
@@ -207,14 +214,14 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
               <div className="space-y-4">
                 {interviewData.technical.map((q, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      
-                 
+                    <div className="flex items-start space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                        <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                      </div>
+                      <p className="text-base text-gray-900 leading-relaxed">
+                        {q.question}
+                      </p>
                     </div>
-                    
-                    <p className="text-base font-medium text-gray-900">
-                      Q{index + 1}: {q.question}
-                    </p>
                   </div>
                 ))}
               </div>
@@ -230,21 +237,51 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">Behavioral Questions</h2>
-                  <p className="text-sm text-gray-600">{interviewData.behavioral.length} questions </p>
+                  <p className="text-sm text-gray-600">{interviewData.behavioral.length} questions with STAR method</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 {interviewData.behavioral.map((q, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
-                
-                    <p className="text-base font-medium text-gray-900">
-                      Q{index + 1}: {q.question}
-                    </p>
-
-
+                    <div className="flex items-start space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                        <span className="text-sm font-bold text-green-600">{index + 1}</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-base text-gray-900 leading-relaxed mb-2">
+                          {q.question}
+                        </p>
+                        <div className="inline-flex items-center px-2 py-1 bg-green-50 rounded text-xs font-medium text-green-700">
+                          💡 Use STAR Method
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
+              </div>
+
+              {/* STAR Method Explanation */}
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-semibold text-green-900 mb-2">STAR Method Framework:</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <span className="font-bold text-green-800">S</span>
+                    <span className="text-green-700">ituation</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-green-800">T</span>
+                    <span className="text-green-700">ask</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-green-800">A</span>
+                    <span className="text-green-700">ction</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-green-800">R</span>
+                    <span className="text-green-700">esult</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
