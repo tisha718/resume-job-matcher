@@ -63,6 +63,14 @@ def delete_blob(blob_url: str):
         # ✅ IMPORTANT: check existence first
         if blob_client.exists():
             blob_client.delete_blob()
+        else:
+            # Blob already deleted → safe to ignore
+            pass
+
+    except Exception as e:
+        raise RuntimeError(str(e))
+    
+    blob_client.delete_blob()
 
 def download_resume_from_blob(blob_url: str) -> bytes:
     """
@@ -81,9 +89,3 @@ def download_resume_from_blob(blob_url: str) -> bytes:
 
     download_stream = blob_client.download_blob()
     return download_stream.readall()
-        else:
-            # Blob already deleted → safe to ignore
-            pass
-
-    except Exception as e:
-        raise RuntimeError(str(e))
