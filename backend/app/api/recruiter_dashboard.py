@@ -77,38 +77,17 @@ def get_particular_job_application_summary(
 
     return response
 
-# AUTO SHORTLISTING BASED ON MIN FIT SCORE
+# OVERALL JOB FIT-SCORE DISTRIBUTION
 
-@router.post("/{job_id}/shortlist")
-def auto_shortlist(
-    job_id: int,
-    min_fit_score: float,
-    db: Session = Depends(get_db)
-):
-    applications = (
-        db.query(Application)
-        .filter(
-            Application.job_id == job_id,
-            Application.fit_score >= min_fit_score
-        )
-        .all()
-    )
+@router.get("/Overall job fit-score-distribution")
+def fit_score_distribution(db: Session = Depends(get_db)):
+    applications = db.query(Application).all()
 
-    if not applications:
-        raise HTTPException(
-            status_code=404,
-            detail="No candidates matched the criteria"
-        )
-
-    # 🔹 Counters for categories
     strong = 0
     good = 0
     average = 0
 
     for app in applications:
-        app.application_status = "shortlisted"
-
-        # 🔹 Fit score categorization
         if app.fit_score >= 80:
             strong += 1
         elif app.fit_score >= 60:
@@ -116,16 +95,52 @@ def auto_shortlist(
         else:
             average += 1
 
-    db.commit()
+    return {
+        "total_applications": len(applications),
+        "fit_score_distribution": {
+            "strong (>=80)": strong,
+            "good (60-79)": good,
+            "average (<60)": average
+        }
+    }
+
+# JOB-WISE FIT-SCORE DISTRIBUTION
+
+@router.get("/{job_id}/fit-score-distribution")
+def job_fit_score_distribution(
+    job_id: int,
+    db: Session = Depends(get_db)
+):
+    applications = (
+        db.query(Application)
+        .filter(Application.job_id == job_id)
+        .all()
+    )
+
+    if not applications:
+        raise HTTPException(
+            status_code=404,
+            detail="No applications found for this job"
+        )
+
+    strong = 0
+    good = 0
+    average = 0
+
+    for app in applications:
+        if app.fit_score >= 80:
+            strong += 1
+        elif app.fit_score >= 60:
+            good += 1
+        else:
+            average += 1
 
     return {
         "job_id": job_id,
-        "min_fit_score": min_fit_score,
-        "shortlisted_count": len(applications),
-        "score_distribution": {
-            "strong": strong,
-            "good": good,
-            "average": average
+        "fit_score_distribution": {
+            "strong (>=80)": strong,
+            "good (60-79)": good,
+            "average (<60)": average
         }
     }
 
