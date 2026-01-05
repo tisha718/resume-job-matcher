@@ -60,3 +60,21 @@ def delete_blob(blob_url: str):
     blob_client = container_client.get_blob_client(blob_name)
 
     blob_client.delete_blob()
+
+def download_resume_from_blob(blob_url: str) -> bytes:
+    """
+    Download a resume file from Azure Blob Storage
+    using its full blob URL.
+    Returns the file content as bytes.
+    """
+
+    # Parse URL → extract blob name
+    parsed = urlparse(blob_url)
+
+    # Example path: /resumes/uuid_filename.pdf
+    blob_name = parsed.path.split(f"/{container_name}/")[-1]
+
+    blob_client = container_client.get_blob_client(blob_name)
+
+    download_stream = blob_client.download_blob()
+    return download_stream.readall()

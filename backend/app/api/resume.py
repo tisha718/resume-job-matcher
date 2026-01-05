@@ -10,6 +10,9 @@ from app.services.blob_storage import (
 
 from app.db.database import get_db
 from app.db.models import Resume
+from fastapi.responses import StreamingResponse
+import io
+from app.services.blob_storage import download_resume_from_blob
 
 router = APIRouter()
 
@@ -170,7 +173,7 @@ def delete_candidate_resume(
             detail=f"Failed to delete resume file from storage: {str(e)}"
         )
 
-    # 🗑️ Delete DB record
+    #  Delete DB record
     db.delete(resume)
     db.commit()
 
@@ -178,3 +181,45 @@ def delete_candidate_resume(
         "message": "Resume deleted successfully",
         "resume_id": resume_id
     }
+
+@router.get("/api/candidate/resume/{resume_id}/download")
+def download_candidate_resume(
+    resume_id: int,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Download resume from Azure Blob Storage.
+    """
+
+    resume = (
+        db.query(Resume)
+        .filter(
+            Resume.id == resume_id,
+            Resume.user_id == user_id
+        )
+        .first()
+    )
+
+    if not resume:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found for this user"
+        )
+
+    try:
+        file_bytes = download_resume_from_blob(resume.file_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to download resume: {str(e)}"
+        )
+
+    return StreamingResponse(
+        io.BytesIO(file_bytes),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{resume.filename}"'
+        }
+    )
+
