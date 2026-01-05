@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -7,6 +7,8 @@ from app.services.matching_service import (
     match_resume_to_job,
     compute_semantic_score,
 )
+
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 router = APIRouter(
     prefix="/api/candidate",
@@ -184,3 +186,39 @@ def apply_for_job(
         "message": "Application submitted successfully",
         "application_id": application.id,
     }
+
+@router.get("/api/candidate/applications")
+async def show_applied_jobs(user_id: int, db: Session = Depends(get_db)):
+    apps = (
+            db.query(Application)
+            .filter(Application.user_id == user_id)
+            .all()
+        )
+    return apps
+
+@router.delete("/{application_id}/hard", summary="Hard delete an application", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_application_hard(
+    application_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    # current_user = Depends(get_current_user),
+):
+    application = db.get(Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail=f"Application {application_id} not found")
+
+    # assert_candidate_owns_application(application, current_user.id)
+
+    try:
+        db.delete(application)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete application due to database constraints. Consider withdrawing instead."
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete application")
+
+    return
