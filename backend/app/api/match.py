@@ -184,3 +184,12 @@ def apply_for_job(
         "message": "Application submitted successfully",
         "application_id": application.id,
     }
+
+@router.get("/api/candidate/applications")
+async def show_applied_jobs(user_id: int, db: Session = Depends(get_db)):
+    apps = (
+            db.query(Application)
+            .filter(Application.user_id == user_id)
+            .all()
+        )
+    return apps
