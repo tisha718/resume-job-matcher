@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Path, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -33,6 +33,93 @@ async def read_users(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
     return job
+
+
+@router.put("/{job_id}", summary="Update job posting")
+async def update_job(
+    job_id: int = Path(..., gt=0, description="Job ID"),
+
+    # All fields are REQUIRED: use Query(...) with ellipsis to mark required
+    title: str = Query(..., description="Job title (≤255 chars, non-empty)"),
+    description: str = Query(..., description="Job description (non-empty)"),
+    company: str = Query(..., description="Company (≤255 chars)"),
+    job_status: str = Query(..., description='Job status: "active" or "closed"'),
+    location: str = Query(..., description="Location (≤255 chars)"),
+    job_type: str = Query(..., description='Job type: "Full-time", "Contract", "Part-Time", "Internship"'),
+
+    db: Session = Depends(get_db),
+    # current_recruiter = Depends(get_current_recruiter)  # if you want ownership checks
+):
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found")
+
+    # Allowed sets
+    allowed_job_types = {"Full-time", "Contract", "Part-Time", "Internship"}
+    allowed_job_statuses = {"active", "closed"}
+
+    # --- Validation ---
+    title = title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="title cannot be empty")
+    if len(title) > 255:
+        raise HTTPException(status_code=422, detail="title exceeds 255 characters")
+
+    description = description.strip()
+    if not description:
+        raise HTTPException(status_code=422, detail="description cannot be empty")
+
+    if len(company) > 255:
+        raise HTTPException(status_code=422, detail="company exceeds 255 characters")
+
+    job_status = job_status.strip()
+    if len(job_status) > 50:
+        raise HTTPException(status_code=422, detail="job_status exceeds 50 characters")
+    if job_status not in allowed_job_statuses:
+        raise HTTPException(status_code=422, detail=f'job_status must be one of {sorted(allowed_job_statuses)}')
+
+    if len(location) > 255:
+        raise HTTPException(status_code=422, detail="location exceeds 255 characters")
+
+    job_type = job_type.strip()
+    if len(job_type) > 50:
+        raise HTTPException(status_code=422, detail="job_type exceeds 50 characters")
+    if job_type not in allowed_job_types:
+        raise HTTPException(status_code=422, detail=f'job_type must be one of {sorted(allowed_job_types)}')
+
+    # --- Apply updates (all required fields) ---
+    job.title = title
+    job.description = description
+    job.company = company
+    job.job_status = job_status
+    job.location = location
+    job.job_type = job_type
+
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    
+    # try:
+    #     db.add(job)
+    #     db.commit()
+    #     db.refresh(job)
+    # except Exception as e:
+    #     db.rollback()
+    #     raise
+
+
+    return {
+        "id": job.id,
+        "recruiter_id": job.recruiter_id,
+        "title": job.title,
+        "description": job.description,
+        "company": job.company,
+        "job_status": job.job_status,
+        "location": job.location,
+        "job_type": job.job_type,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+    }
 
 @router.post("/jobs/new")
 async def create_job(
