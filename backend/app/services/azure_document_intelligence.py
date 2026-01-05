@@ -1,39 +1,38 @@
 import os
-from dotenv import load_dotenv
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
+from dotenv import load_dotenv
 
 load_dotenv()
 
 endpoint = os.getenv("AZURE_DOC_INTEL_ENDPOINT")
-key = os.getenv("AZURE_DOC_INTEL_KEY")
+api_key = os.getenv("AZURE_DOC_INTEL_KEY")
 
-if not endpoint or not key:
-    raise RuntimeError("Azure Document Intelligence credentials missing")
+if not endpoint or not api_key:
+    raise RuntimeError(
+        "Azure Document Intelligence credentials not set in .env"
+    )
 
 client = DocumentAnalysisClient(
     endpoint=endpoint,
-    credential=AzureKeyCredential(key)
+    credential=AzureKeyCredential(api_key)
 )
 
 
-def extract_text_from_image(file) -> str:
+def extract_text_from_image(file_bytes: bytes) -> str:
     """
-    Uses Azure Document Intelligence to extract text
-    from images or scanned PDFs.
+    Extract text from image-based resume using Azure Document Intelligence.
     """
-
     poller = client.begin_analyze_document(
         model_id="prebuilt-read",
-        document=file.file
+        document=file_bytes
     )
 
     result = poller.result()
 
-    extracted_text = []
-
+    lines = []
     for page in result.pages:
         for line in page.lines:
-            extracted_text.append(line.content)
+            lines.append(line.content)
 
-    return "\n".join(extracted_text)
+    return "\n".join(lines)
