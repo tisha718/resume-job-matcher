@@ -31,7 +31,7 @@ const RecruiterDashboard = () => {
   const recruiterId = user?.id || user?.recruiter_id || 10; // fallback to 10 for now
 
 
-  // ✅ Define handlers BEFORE usage
+  // Open edit for a specific job
   const handleEditJob = (job) => {
     setEditingJob(job);
     setShowJobModal(true);
@@ -141,21 +141,37 @@ const RecruiterDashboard = () => {
 
   
 // ✅ 3) Call fetchJobs after successful job creation
+  
   const handleJobSubmit = async (jobData) => {
-    // normalize and validate fields
+    // 1) Normalize incoming fields from the modal (support both keys: type/job_type, status/job_status, company/companyName)
     const title = jobData?.title;
     const description = jobData?.description;
     const company = jobData?.company || jobData?.companyName;
     const location = jobData?.location;
-    const job_type = jobData?.job_type || jobData?.type;
+    const rawJobType = jobData?.job_type || jobData?.type;
     const job_status = jobData?.job_status || jobData?.status;
 
+    // 2) Normalize job type casing/values if necessary
+    // Backend expects: "Full-time", "Contract", "Part-Time", "Internship" (per your Swagger)
+    const normalizeType = (t) => {
+      if (!t) return t;
+      const s = String(t).trim().toLowerCase();
+      if (s === 'full-time' || s === 'full time') return 'Full-time';
+      if (s === 'contract') return 'Contract';
+      if (s === 'part-time' || s === 'part time') return 'Part-time';
+      if (s === 'internship') return 'Internship';
+      // Fallback to original value if not matched
+      return t;
+    };
+    const normalizedJobType = normalizeType(rawJobType);
+
+    // 3) Validate required fields (PUT requires all; POST requires all per your endpoint)
     const missing = [];
     if (!title) missing.push('title');
     if (!description) missing.push('description');
     if (!company) missing.push('company');
     if (!location) missing.push('location');
-    if (!job_type) missing.push('job_type');
+    if (!normalizedJobType) missing.push('job_type');
     if (!job_status) missing.push('job_status');
 
     if (missing.length) {
@@ -164,35 +180,77 @@ const RecruiterDashboard = () => {
     }
 
     try {
-      const { data } = await recruiterAPI.createJob({
-        recruiter_id: recruiterId, // <-- same id as fetch
-        title,
-        description,
-        company,
-        location,
-        job_type,
-        job_status,
-      });
+      if (editingJob) {
+        // ✅ UPDATE existing job
+        const jobId = editingJob.id;
 
-      alert(data?.message || 'Job created successfully!');
-      setShowJobModal(false);
-      setEditingJob(null);
+        const { data } = await recruiterAPI.updateJob(jobId, {
+          title,
+          description,
+          company,
+          location,
+          job_type: normalizedJobType, // <-- send normalizedJobType
+          job_status,
+        });
 
-      // 🔁 refresh the list
-      await fetchJobs();
+        alert('Job updated successfully!');
+        setShowJobModal(false);
+        setEditingJob(null);
 
-      // Optional: jump to 'jobs' tab to show the update
-      setActiveTab('jobs');
+        // Refresh the list from server
+        await fetchJobs();
+        setActiveTab('jobs');
+
+          // (Optional) Optimistic update if you prefer not to refetch:
+          // setJobs(prev => prev.map(j =>
+          //   j.id === jobId
+          //     ? { ...j, title, companyName: company, description, location, type: normalizedJobType, status: job_status }
+          //     : j
+          // ));
+      } else {
+        // ✅ CREATE new job
+        const { data } = await recruiterAPI.createJob({
+          recruiter_id: recruiterId, // ensure recruiterId matches your fetch (e.g., 50)
+          title,
+          description,
+          company,
+          location,
+          job_type: normalizedJobType, // <-- send normalizedJobType
+          job_status,
+        });
+
+        alert(data?.message || 'Job created successfully!');
+        setShowJobModal(false);
+        setEditingJob(null);
+
+        await fetchJobs();
+        setActiveTab('jobs');
+
+        // (Optional) Optimistic push:
+        // const newJob = {
+        //   id: data?.job_id ?? Math.random(),
+        //   title,
+        //   companyName: company,
+        //   description,
+        //   location,
+        //   type: normalizedJobType,
+        //   status: job_status,
+        //   created: new Date().toISOString().slice(0, 10),
+        //   applicants: 0,
+        //   strongMatches: 0,
+        //   goodMatches: 0,
+        // };
+        // setJobs(prev => [newJob, ...prev]);
+      }
     } catch (err) {
-      console.error('Failed to create job', err);
+      console.error('Failed to submit job', err);
       const msg =
         err?.response?.data?.detail ||
         err?.message ||
-        'Failed to create job. Please try again.';
+        'Failed to submit job. Please try again.';
       alert(msg);
     }
   };
-
 
 
   
@@ -307,13 +365,24 @@ const RecruiterDashboard = () => {
           <aside className="hidden lg:block w-64 shrink-0">
             <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
               <button
-                onClick={() => setShowJobModal(true)}
+                onClick={() => {
+                  setEditingJob(null);       // <-- important so initialData becomes null
+                  setShowJobModal(true)
+                }}
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 <span className="font-medium">Post New Job</span>
               </button>
             </div>
+            
+            {/* <button
+              onClick={() => {
+                setShowJobModal(true);
+              }}
+            >
+              Post New Job
+            </button> */}
             
             <div className="bg-white rounded-xl shadow-sm p-4">
               <nav className="space-y-2">
@@ -496,15 +565,27 @@ const RecruiterDashboard = () => {
           </main>
         </div>
       </div>
-
-      <CreateJobModal 
+      
+      <CreateJobModal
+        key={editingJob ? `edit-${editingJob.id}` : 'new'}  // <-- forces remount per job/new
         isOpen={showJobModal}
         onClose={() => {
           setShowJobModal(false);
-          setEditingJob(null);
+          setEditingJob(null);       // <-- ensures next "New" opens blank
         }}
         onSubmit={handleJobSubmit}
-        initialData={editingJob}
+        initialData={
+          editingJob
+            ? {
+                title: editingJob.title,
+                description: editingJob.description,
+                companyName: editingJob.companyName || editingJob.company, // map for your modal
+                location: editingJob.location,
+                type: editingJob.type || editingJob.job_type,
+                status: editingJob.status || editingJob.job_status,
+              }
+            : null
+        }
       />
 
       <JobDetailsModal 

@@ -141,6 +141,19 @@ export const recruiterAPI = {
         job_status: payload.job_status,
       },
     }),
+
+  updateJob: (jobId, payload) =>
+    api.put(`/api/recruiter/jobs/${jobId}`, null, {
+      params: {
+        title: payload.title,
+        description: payload.description,
+        company: payload.company,
+        job_status: payload.job_status,
+        location: payload.location,
+        job_type: payload.job_type,
+      },
+    }),
+
   getJobCandidates: (jobId) => api.get(`/api/recruiter/jobs/${jobId}/candidates`),
   getDashboardStats: () => api.get('/api/recruiter/dashboard/stats'),
   generateQuestions: (jobId) => api.post(`/api/recruiter/jobs/${jobId}/interview-questions`),
