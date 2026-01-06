@@ -40,6 +40,7 @@ async def get_job_by_recruiter_id(recruiter_id: int, db: Session = Depends(get_d
     job = (
         db.query(Job)
         .filter(Job.recruiter_id == recruiter_id)
+        .order_by(Job.created_at.desc())  # Use .asc() for ascending order
         .all()
     )
 
