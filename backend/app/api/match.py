@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.db.models import Resume, Job, Application
 from app.services.matching_service import (
     match_resume_to_job,
@@ -11,7 +11,7 @@ from app.services.matching_service import (
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 router = APIRouter(
-    prefix="/api/candidate",
+    prefix="/candidate",
     tags=["Candidate Jobs"]
 )
 
@@ -187,7 +187,7 @@ def apply_for_job(
         "application_id": application.id,
     }
 
-@router.get("/api/candidate/applications")
+@router.get("/applications")
 async def show_applied_jobs(user_id: int, db: Session = Depends(get_db)):
     apps = (
             db.query(Application)
