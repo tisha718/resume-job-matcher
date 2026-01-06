@@ -8,14 +8,81 @@ import DashboardNavbar from '../common/DashboardNavbar';
 import StatCard from '../common/StatCard';
 import CreateJobModal from './CreateJobModal';
 import { useAuth } from '../../context/AuthContext';
-import JobCard from './JobCardWithApplicants';
+// import JobCard from './JobCardWithApplicants';
 import JobDetailsModal from './JobDetailsModal';
 import { AnalyticsPipeline, MatchDistributionChart, TopSkillsChart } from './AnalyticsComponents';
+import { recruiterAPI } from '../../services/api';
+import JobCardWithApplicants from './JobCardWithApplicants';
 
 const RecruiterDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  
+  // NEW: real jobs state
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [jobsError, setJobsError] = useState('');
+  
+// Static recruiter id for now
+  const RECRUITER_ID = 10; // use 50 to match your create example
+
+// Determine recruiterId
+  // Option A: from user context (preferred if available)
+  const recruiterId = user?.id || user?.recruiter_id || 10; // fallback to 10 for now
+
+
+  // Open edit for a specific job
+  const handleEditJob = (job) => {
+    setEditingJob(job);
+    setShowJobModal(true);
+  };
+
+  const handleViewJobDetails = (job) => {
+    setSelectedJob(job);
+    setShowJobDetailsModal(true);
+  };
+
+
+
+  
+  const fetchJobs = async () => {
+    setJobsLoading(true);
+    setJobsError('');
+    try {
+      const { data } = await recruiterAPI.getJobsByRecruiter(recruiterId);
+      const mapped = (data || []).map(j => ({
+        id: j.id,
+        title: j.title,
+        companyName: j.company,
+        description: j.description,
+        location: j.location,
+        type: j.job_type,
+        status: j.job_status,
+        created: j.created_at?.slice(0, 10), // YYYY-MM-DD
+        applicants: 0,
+        strongMatches: 0,
+        goodMatches: 0,
+      }));
+      setJobs(mapped);
+    } catch (err) {
+      console.error('Failed to load jobs', err);
+      setJobsError(
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to load jobs. Please try again.'
+      );
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
+  
+  // ✅ 2) Call fetchJobs on mount (and whenever recruiterId changes)
+  useEffect(() => {
+    fetchJobs();
+  }, [recruiterId]); // add recruiterId dependency
+
 
   
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
@@ -69,70 +136,159 @@ const RecruiterDashboard = () => {
     sessionStorage.clear();
     navigate('/login', { replace: true });
   };
+  
+  const [creatingJob, setCreatingJob] = useState(false); // optional: disable button during submit
+  const [createError, setCreateError] = useState('');
 
-  const handleJobSubmit = (jobData) => {
-    if (editingJob) {
-      alert('Job updated successfully!');
-    } else {
-      alert('Job posted successfully!');
+  
+// ✅ 3) Call fetchJobs after successful job creation
+  
+  const handleJobSubmit = async (jobData) => {
+    // 1) Normalize incoming fields from the modal (support both keys: type/job_type, status/job_status, company/companyName)
+    const title = jobData?.title;
+    const description = jobData?.description;
+    const company = jobData?.company || jobData?.companyName;
+    const location = jobData?.location;
+    const rawJobType = jobData?.job_type || jobData?.type;
+    const job_status = jobData?.job_status || jobData?.status;
+
+    // 2) Normalize job type casing/values if necessary
+    // Backend expects: "Full-time", "Contract", "Part-Time", "Internship" (per your Swagger)
+    const normalizeType = (t) => {
+      if (!t) return t;
+      const s = String(t).trim().toLowerCase();
+      if (s === 'full-time' || s === 'full time') return 'Full-time';
+      if (s === 'contract') return 'Contract';
+      if (s === 'part-time' || s === 'part time') return 'Part-time';
+      if (s === 'internship') return 'Internship';
+      // Fallback to original value if not matched
+      return t;
+    };
+    const normalizedJobType = normalizeType(rawJobType);
+
+    // 3) Validate required fields (PUT requires all; POST requires all per your endpoint)
+    const missing = [];
+    if (!title) missing.push('title');
+    if (!description) missing.push('description');
+    if (!company) missing.push('company');
+    if (!location) missing.push('location');
+    if (!normalizedJobType) missing.push('job_type');
+    if (!job_status) missing.push('job_status');
+
+    if (missing.length) {
+      alert(`Please fill: ${missing.join(', ')}`);
+      return;
     }
-    setShowJobModal(false);
-    setEditingJob(null);
+
+    try {
+      if (editingJob) {
+        // ✅ UPDATE existing job
+        const jobId = editingJob.id;
+
+        const { data } = await recruiterAPI.updateJob(jobId, {
+          title,
+          description,
+          company,
+          location,
+          job_type: normalizedJobType, // <-- send normalizedJobType
+          job_status,
+        });
+
+        alert('Job updated successfully!');
+        setShowJobModal(false);
+        setEditingJob(null);
+
+        // Refresh the list from server
+        await fetchJobs();
+        setActiveTab('jobs');
+
+          // (Optional) Optimistic update if you prefer not to refetch:
+          // setJobs(prev => prev.map(j =>
+          //   j.id === jobId
+          //     ? { ...j, title, companyName: company, description, location, type: normalizedJobType, status: job_status }
+          //     : j
+          // ));
+      } else {
+        // ✅ CREATE new job
+        const { data } = await recruiterAPI.createJob({
+          recruiter_id: recruiterId, // ensure recruiterId matches your fetch (e.g., 50)
+          title,
+          description,
+          company,
+          location,
+          job_type: normalizedJobType, // <-- send normalizedJobType
+          job_status,
+        });
+
+        alert(data?.message || 'Job created successfully!');
+        setShowJobModal(false);
+        setEditingJob(null);
+
+        await fetchJobs();
+        setActiveTab('jobs');
+
+        // (Optional) Optimistic push:
+        // const newJob = {
+        //   id: data?.job_id ?? Math.random(),
+        //   title,
+        //   companyName: company,
+        //   description,
+        //   location,
+        //   type: normalizedJobType,
+        //   status: job_status,
+        //   created: new Date().toISOString().slice(0, 10),
+        //   applicants: 0,
+        //   strongMatches: 0,
+        //   goodMatches: 0,
+        // };
+        // setJobs(prev => [newJob, ...prev]);
+      }
+    } catch (err) {
+      console.error('Failed to submit job', err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to submit job. Please try again.';
+      alert(msg);
+    }
   };
 
-  const handleEditJob = (job) => {
-    setEditingJob(job);
-    setShowJobModal(true);
+  const handleDeleteJob = async (job) => {
+  try {
+      console.log('[Delete] Requesting delete for job id:', job.id);
+      const res = await recruiterAPI.deleteJob(job.id); // DELETE /api/recruiter/{job_id}
+      console.log('[Delete] Response status:', res?.status); // should be 204
+
+      if (res?.status === 204 || res?.status === 200) {
+        // Optimistically remove from UI
+        setJobs((prev) => prev.filter((j) => j.id !== job.id));
+        alert('Job deleted successfully.');
+        // Optional: await fetchJobs(); // ensure consistency
+      } else {
+        alert(`Unexpected delete response status: ${res?.status ?? 'unknown'}`);
+      }
+    } catch (err) {
+      console.error('[Delete] Failed:', err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to delete job. Please try again.';
+      alert(msg);
+    }
   };
 
-  const handleViewJobDetails = (job) => {
-    setSelectedJob(job);
-    setShowJobDetailsModal(true);
-  };
+  // In the Jobs tab render:
+  {jobs.map((job) => (
+    <JobCardWithApplicants
+      key={job.id}
+      job={job}
+      onViewDetails={handleViewJobDetails}
+      onEdit={handleEditJob}
+      onDelete={handleDeleteJob}
+    />
+  ))}
 
-  // Mock data
-  const mockJobs = [
-    { 
-      id: 1, 
-      title: 'Senior Full Stack Developer', 
-      companyName: 'TechCorp Inc.',
-      description: 'We are looking for an experienced Full Stack Developer to join our team...',
-      location: 'San Francisco, CA',
-      type: 'Full-time',
-      applicants: 45, 
-      strongMatches: 12, 
-      goodMatches: 18, 
-      created: '2024-01-15', 
-      status: 'active' 
-    },
-    { 
-      id: 2, 
-      title: 'Backend Engineer', 
-      companyName: 'StartupXYZ',
-      description: 'Join our backend team to build scalable microservices...',
-      location: 'Remote',
-      type: 'Full-time',
-      applicants: 32, 
-      strongMatches: 8, 
-      goodMatches: 15, 
-      created: '2024-01-20', 
-      status: 'active' 
-    },
-    { 
-      id: 3, 
-      title: 'DevOps Engineer', 
-      companyName: 'CloudSystems Ltd.',
-      description: 'Help us build and maintain our cloud infrastructure...',
-      location: 'New York, NY',
-      type: 'Contract',
-      applicants: 28, 
-      strongMatches: 10, 
-      goodMatches: 12, 
-      created: '2024-01-22', 
-      status: 'closed' 
-    },
-  ];
-
+  
   const mockCandidates = [
     {
       id: 1, name: 'John Doe', email: 'john.doe@email.com', phone: '+1 234-567-8900',
@@ -157,11 +313,11 @@ const RecruiterDashboard = () => {
     },
   ];
 
-  const mockStats = {
-    totalJobs: mockJobs.length,
-    totalApplicants: 105,
-    avgMatchScore: 78,
-    activeJobs: mockJobs.filter(j => j.status === 'active').length
+  const stats = {
+    totalJobs: jobs.length,
+    totalApplicants: 105, // if you don’t have this yet, keep a placeholder or compute if available
+    avgMatchScore: 78,    // placeholder
+    activeJobs: jobs.filter(j => j.status === 'active').length
   };
 
   const getMatchColor = (score) => {
@@ -182,12 +338,12 @@ const RecruiterDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardNavbar 
-  userType="recruiter"
-  userName={user?.name || 'Recruiter'}
-  onLogout={handleLogout}
-  onMenuToggle={() => setShowMobileMenu(!showMobileMenu)}
-  showMobileMenu={showMobileMenu}
-/>
+      userType="recruiter"
+      userName={user?.name || 'Recruiter'}
+      onLogout={handleLogout}
+      onMenuToggle={() => setShowMobileMenu(!showMobileMenu)}
+      showMobileMenu={showMobileMenu}
+    />
 
 
 
@@ -244,13 +400,24 @@ const RecruiterDashboard = () => {
           <aside className="hidden lg:block w-64 shrink-0">
             <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
               <button
-                onClick={() => setShowJobModal(true)}
+                onClick={() => {
+                  setEditingJob(null);       // <-- important so initialData becomes null
+                  setShowJobModal(true)
+                }}
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 <span className="font-medium">Post New Job</span>
               </button>
             </div>
+            
+            {/* <button
+              onClick={() => {
+                setShowJobModal(true);
+              }}
+            >
+              Post New Job
+            </button> */}
             
             <div className="bg-white rounded-xl shadow-sm p-4">
               <nav className="space-y-2">
@@ -284,7 +451,7 @@ const RecruiterDashboard = () => {
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard Overview</h1>
                 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                   <StatCard 
                     title="Total Jobs" 
                     value={mockStats.totalJobs} 
@@ -313,7 +480,7 @@ const RecruiterDashboard = () => {
                     bgColor="bg-yellow-100"
                     iconColor="text-yellow-600"
                   />
-                </div>
+                </div> */}
 
                 {/* Analytics Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -326,18 +493,27 @@ const RecruiterDashboard = () => {
               </div>
             )}
 
+            
             {/* Jobs Tab */}
             {activeTab === 'jobs' && (
               <div className="space-y-4 sm:space-y-6">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Posted Jobs</h1>
-                
+
+                {/* Loading / Error states */}
+                {jobsLoading && <p className="text-gray-600">Loading jobs...</p>}
+                {jobsError && <p className="text-red-600">{jobsError}</p>}
+
                 <div className="space-y-3 sm:space-y-4">
-                  {mockJobs.map((job) => (
-                    <JobCard 
+                  {!jobsLoading && !jobsError && jobs.length === 0 && (
+                    <p className="text-gray-600">No jobs posted yet.</p>
+                  )}
+                  {jobs.map((job) => (
+                    <JobCardWithApplicants
                       key={job.id}
                       job={job}
                       onViewDetails={handleViewJobDetails}
                       onEdit={handleEditJob}
+                      onDelete={handleDeleteJob}
                     />
                   ))}
                 </div>
@@ -425,15 +601,27 @@ const RecruiterDashboard = () => {
           </main>
         </div>
       </div>
-
-      <CreateJobModal 
+      
+      <CreateJobModal
+        key={editingJob ? `edit-${editingJob.id}` : 'new'}  // <-- forces remount per job/new
         isOpen={showJobModal}
         onClose={() => {
           setShowJobModal(false);
-          setEditingJob(null);
+          setEditingJob(null);       // <-- ensures next "New" opens blank
         }}
         onSubmit={handleJobSubmit}
-        initialData={editingJob}
+        initialData={
+          editingJob
+            ? {
+                title: editingJob.title,
+                description: editingJob.description,
+                companyName: editingJob.companyName || editingJob.company, // map for your modal
+                location: editingJob.location,
+                type: editingJob.type || editingJob.job_type,
+                status: editingJob.status || editingJob.job_status,
+              }
+            : null
+        }
       />
 
       <JobDetailsModal 

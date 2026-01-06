@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Users, ArrowLeft, Download, Save, Check } from 'lucide-react';
+import { Edit, Users, ArrowLeft, Download, Trash, Save, Check } from 'lucide-react';
 import { resumeAPI, applicationAPI } from '../../services/api';
 
 // JobApplicantsView Component
@@ -332,7 +332,14 @@ const JobApplicantsView = ({ job, onBack }) => {
 };
 
 // JobCard Component
-const JobCard = ({ job, onViewDetails, onEdit, onViewApplicants }) => {
+const JobCard = ({ job, onViewDetails, onEdit, onViewApplicants, onDelete }) => {
+  const handleDeleteClick = () => {
+    const ok = window.confirm('Are you sure you want to delete this job? This action cannot be undone.');
+    if (ok && typeof onDelete === 'function') {
+      onDelete(job);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow p-4 sm:p-6">
       <div className="flex items-start justify-between mb-4">
@@ -356,6 +363,16 @@ const JobCard = ({ job, onViewDetails, onEdit, onViewApplicants }) => {
         >
           <Edit className="w-5 h-5" />
         </button>
+
+        {/* Delete */}
+        <button
+          onClick={handleDeleteClick}
+          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          title="Delete Job"
+        >
+          <Trash className="w-5 h-5" />
+        </button>
+
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
@@ -378,7 +395,7 @@ const JobCard = ({ job, onViewDetails, onEdit, onViewApplicants }) => {
 };
 
 // Main Component with integrated functionality
-const JobCardWithApplicants = ({ job, onViewDetails, onEdit }) => {
+const JobCardWithApplicants = ({ job, onViewDetails, onEdit, onDelete }) => {
   const [showApplicantsView, setShowApplicantsView] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
 
@@ -403,6 +420,7 @@ const JobCardWithApplicants = ({ job, onViewDetails, onEdit }) => {
       onViewDetails={onViewDetails}
       onEdit={onEdit}
       onViewApplicants={handleViewApplicants}
+      onDelete={onDelete}
     />
   );
 };
