@@ -154,7 +154,7 @@ def update_application_status(
 ):
     allowed_statuses = [
         "applied",
-        "screened",
+        "shortlisted",
         "interviewed",
         "offered",
         "rejected"
