@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from app.auth.deps import get_current_user
 
 from app.db.session import get_db
 from app.db import models
@@ -12,8 +13,7 @@ from .security import (
     get_password_hash,
 )
 
-router = APIRouter(prefix="/auth", tags=["auth"])
-
+router = APIRouter(tags=["Auth"])
 
 @router.post("/login", response_model=Token)
 async def login(
@@ -88,3 +88,13 @@ async def signup(
     )
 
     return Token(access_token=token)
+
+@router.post("/logout")
+async def logout(current_user = Depends(get_current_user)):
+    """
+    JWT logout is handled on the client side.
+    Backend simply confirms logout.
+    """
+    return {
+        "message": "Logout successful. Please delete token on client."
+    }

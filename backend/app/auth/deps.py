@@ -1,29 +1,30 @@
 # app/auth/deps.py
+# app/auth/deps.py
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
+
 from .security import decode_token, TokenData
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+security = HTTPBearer()
 
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> TokenData:
+    token = credentials.credentials  # <- raw JWT
+
     try:
         token_data = decode_token(token)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     if not token_data.sub:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing subject",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return token_data
