@@ -7,10 +7,12 @@ load_dotenv()
 
 from app.api.resume import router as resume_router
 from app.api.match import router as candidate_router
+from .api.recruiter_dashboard import router as recruiter_dashboard
 from app.api.preparation import router as preparation_router
 
 from app.auth.routes import router as auth_router
 from app.auth.deps import get_current_user
+from app.api.recruiter import router as recruiter_router
 
 app = FastAPI(title="Smart Resume Screening API")
 
@@ -44,6 +46,10 @@ app.include_router(
     dependencies=[Depends(get_current_user)],
 )
 
+app.include_router(recruiter_router)
+
+app.include_router(recruiter_dashboard)
+
 @app.get("/")
 def root():
     return {"message": "Smart Resume Screening API is running"}
@@ -51,3 +57,4 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "OK"}
+ 

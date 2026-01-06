@@ -1,11 +1,15 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
+import io
 
 from app.services.text_extraction import extract_text
 from app.services.skill_extraction import extract_skills
+from app.services.azure_document_intelligence import extract_text_from_image
 from app.services.blob_storage import (
     upload_resume_to_blob,
-    delete_blob
+    delete_blob,
+    download_resume_from_blob
 )
 
 from app.db.database import get_db
@@ -23,7 +27,15 @@ async def upload_resume(file: UploadFile = File(...)):
     Basic resume upload (text preview only).
     Stateless endpoint.
     """
-    text = extract_text(file)
+
+    content_type = file.content_type.lower()
+
+    if content_type.startswith("image/"):
+        file_bytes = await file.read()
+        text = extract_text_from_image(file_bytes)
+    else:
+        text = extract_text(file)
+
     return {
         "filename": file.filename,
         "text_length": len(text),
@@ -36,7 +48,15 @@ async def extract_resume_skills(file: UploadFile = File(...)):
     """
     Extract skills from resume (stateless).
     """
-    text = extract_text(file)
+
+    content_type = file.content_type.lower()
+
+    if content_type.startswith("image/"):
+        file_bytes = await file.read()
+        text = extract_text_from_image(file_bytes)
+    else:
+        text = extract_text(file)
+
     skills = extract_skills(text)
 
     return {
@@ -62,11 +82,25 @@ async def candidate_upload_resume(
     """
 
     try:
+        # ✅ READ FILE ONCE
+        file_bytes = await resume.read()
+
+        # ✅ Rewind stream for blob upload
+        resume.file = io.BytesIO(file_bytes)
+
         # 1. Upload to Azure Blob
         blob_url = upload_resume_to_blob(resume)
 
-        # 2. Extract text & skills
-        resume_text = extract_text(resume)
+        # 2. Extract text based on file type
+        content_type = resume.content_type.lower()
+
+        if content_type.startswith("image/"):
+            resume_text = extract_text_from_image(file_bytes)
+        else:
+            # For PDF/DOCX, recreate UploadFile stream
+            resume.file = io.BytesIO(file_bytes)
+            resume_text = extract_text(resume)
+
         skills = extract_skills(resume_text)
 
         # 3. Store in DB
@@ -103,10 +137,6 @@ def get_all_resumes_for_user(
     user_id: int,
     db: Session = Depends(get_db)
 ):
-    """
-    Fetch all resumes uploaded by a user.
-    """
-
     resumes = (
         db.query(Resume)
         .filter(Resume.user_id == user_id)
@@ -142,10 +172,6 @@ def delete_candidate_resume(
     user_id: int,
     db: Session = Depends(get_db)
 ):
-    """
-    Delete resume from DB + Azure Blob Storage.
-    """
-
     resume = (
         db.query(Resume)
         .filter(
@@ -161,7 +187,6 @@ def delete_candidate_resume(
             detail="Resume not found for this user"
         )
 
-    # 🔥 Delete blob FIRST (safe + idempotent now)
     try:
         delete_blob(resume.file_path)
     except Exception as e:
@@ -170,7 +195,6 @@ def delete_candidate_resume(
             detail=f"Failed to delete resume file from storage: {str(e)}"
         )
 
-    # 🗑️ Then delete DB record
     db.delete(resume)
     db.commit()
 
@@ -178,3 +202,41 @@ def delete_candidate_resume(
         "message": "Resume deleted successfully",
         "resume_id": resume_id
     }
+
+
+@router.get("/api/candidate/resume/{resume_id}/download")
+def download_candidate_resume(
+    resume_id: int,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    resume = (
+        db.query(Resume)
+        .filter(
+            Resume.id == resume_id,
+            Resume.user_id == user_id
+        )
+        .first()
+    )
+
+    if not resume:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found for this user"
+        )
+
+    try:
+        file_bytes = download_resume_from_blob(resume.file_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to download resume: {str(e)}"
+        )
+
+    return StreamingResponse(
+        io.BytesIO(file_bytes),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{resume.filename}"'
+        }
+    )

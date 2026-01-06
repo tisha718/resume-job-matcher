@@ -12,3 +12,4 @@ dist/
 .DS_Store
 
 datasets/
+py3.10.11-env/

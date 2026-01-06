@@ -78,6 +78,7 @@ class Job(Base):
 # --------------------------------------------------
 # APPLICATIONS (NO resume_id ❌)
 # --------------------------------------------------
+APPLICATION_STATUSES = ("applied", "screened", "interviewed", "offered", "rejected")
 class Application(Base):
     __tablename__ = "applications"
 

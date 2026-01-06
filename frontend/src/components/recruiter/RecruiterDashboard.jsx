@@ -1,122 +1,159 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Briefcase, Users, TrendingUp, LogOut, Plus, Eye, MessageSquare, 
-  BarChart3, FileText, User, Mail, MapPin, Phone, Download, X, Menu
+  Briefcase, Users, TrendingUp, Plus, X, Menu,
+  User, Mail, MapPin, Phone, Download, FileText
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import DashboardNavbar from '../common/DashboardNavbar';
+import StatCard from '../common/StatCard';
+import CreateJobModal from './CreateJobModal';
+import { useAuth } from '../../context/AuthContext';
+import JobCard from './JobCardWithApplicants';
+import JobDetailsModal from './JobDetailsModal';
+import { AnalyticsPipeline, MatchDistributionChart, TopSkillsChart } from './AnalyticsComponents';
 
 const RecruiterDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
   const [showJobModal, setShowJobModal] = useState(false);
+  const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  
-  const [jobForm, setJobForm] = useState({
-    title: '',
-    description: '',
-    location: '',
-    type: 'Full-time'
-  });
+  const [editingJob, setEditingJob] = useState(null);
 
-  const handleLogout = () => {
-    // Clear any stored authentication tokens
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userType');
-    sessionStorage.clear();
-    
+  // Initialize history state on mount
+  useEffect(() => {
+    if (!window.history.state?.initialized) {
+      window.history.replaceState(
+        { initialized: true, tab: activeTab, page: 'recruiter-dashboard' }, 
+        '', 
+        '/recruiter-dashboard'
+      );
+    }
+  }, []);
 
-    window.location.href = '/login';
+  // Handle tab changes - push to history
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    window.history.pushState(
+      { tab: newTab, page: 'recruiter-dashboard' }, 
+      '', 
+      '/recruiter-dashboard'
+    );
   };
 
-  const handleJobSubmit = (e) => {
-    e.preventDefault();
-    alert('Job posted successfully!');
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state?.page === 'recruiter-dashboard') {
+        if (event.state?.tab) {
+          setActiveTab(event.state.tab);
+        }
+      } else {
+        navigate(-1);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userType');
+    localStorage.removeItem('user');
+    sessionStorage.clear();
+    navigate('/login', { replace: true });
+  };
+
+  const handleJobSubmit = (jobData) => {
+    if (editingJob) {
+      alert('Job updated successfully!');
+    } else {
+      alert('Job posted successfully!');
+    }
     setShowJobModal(false);
-    setJobForm({
-      title: '',
-      description: '',
-      location: '',
-      type: 'Full-time'
-    });
+    setEditingJob(null);
+  };
+
+  const handleEditJob = (job) => {
+    setEditingJob(job);
+    setShowJobModal(true);
+  };
+
+  const handleViewJobDetails = (job) => {
+    setSelectedJob(job);
+    setShowJobDetailsModal(true);
   };
 
   // Mock data
   const mockJobs = [
-    { id: 1, title: 'Senior Full Stack Developer', applicants: 45, strongMatches: 12, goodMatches: 18, created: '2024-01-15' },
-    { id: 2, title: 'Backend Engineer', applicants: 32, strongMatches: 8, goodMatches: 15, created: '2024-01-20' },
-    { id: 3, title: 'DevOps Engineer', applicants: 28, strongMatches: 10, goodMatches: 12, created: '2024-01-22' },
+    { 
+      id: 1, 
+      title: 'Senior Full Stack Developer', 
+      companyName: 'TechCorp Inc.',
+      description: 'We are looking for an experienced Full Stack Developer to join our team...',
+      location: 'San Francisco, CA',
+      type: 'Full-time',
+      applicants: 45, 
+      strongMatches: 12, 
+      goodMatches: 18, 
+      created: '2024-01-15', 
+      status: 'active' 
+    },
+    { 
+      id: 2, 
+      title: 'Backend Engineer', 
+      companyName: 'StartupXYZ',
+      description: 'Join our backend team to build scalable microservices...',
+      location: 'Remote',
+      type: 'Full-time',
+      applicants: 32, 
+      strongMatches: 8, 
+      goodMatches: 15, 
+      created: '2024-01-20', 
+      status: 'active' 
+    },
+    { 
+      id: 3, 
+      title: 'DevOps Engineer', 
+      companyName: 'CloudSystems Ltd.',
+      description: 'Help us build and maintain our cloud infrastructure...',
+      location: 'New York, NY',
+      type: 'Contract',
+      applicants: 28, 
+      strongMatches: 10, 
+      goodMatches: 12, 
+      created: '2024-01-22', 
+      status: 'closed' 
+    },
   ];
 
   const mockCandidates = [
     {
-      id: 1,
-      name: 'John Doe',
-      email: 'john.doe@email.com',
-      phone: '+1 234-567-8900',
-      location: 'San Francisco, CA',
-      matchScore: 0.92,
-      experience: '5 years',
+      id: 1, name: 'John Doe', email: 'john.doe@email.com', phone: '+1 234-567-8900',
+      location: 'San Francisco, CA', matchScore: 0.92, experience: '5 years',
       skills: ['React', 'Node.js', 'Python', 'AWS', 'Docker'],
-      education: 'B.S. Computer Science',
-      appliedDate: '2024-01-15',
-      status: 'New',
-      jobApplied: 'Senior Full Stack Developer'
+      education: 'B.S. Computer Science', appliedDate: '2024-01-15',
+      status: 'New', jobApplied: 'Senior Full Stack Developer'
     },
     {
-      id: 2,
-      name: 'Sarah Smith',
-      email: 'sarah.smith@email.com',
-      phone: '+1 234-567-8901',
-      location: 'New York, NY',
-      matchScore: 0.88,
-      experience: '4 years',
+      id: 2, name: 'Sarah Smith', email: 'sarah.smith@email.com', phone: '+1 234-567-8901',
+      location: 'New York, NY', matchScore: 0.88, experience: '4 years',
       skills: ['React', 'JavaScript', 'MongoDB', 'Express', 'Git'],
-      education: 'B.Tech Information Technology',
-      appliedDate: '2024-01-16',
-      status: 'Reviewed',
-      jobApplied: 'Senior Full Stack Developer'
+      education: 'B.Tech Information Technology', appliedDate: '2024-01-16',
+      status: 'Reviewed', jobApplied: 'Senior Full Stack Developer'
     },
     {
-      id: 3,
-      name: 'Mike Johnson',
-      email: 'mike.j@email.com',
-      phone: '+1 234-567-8902',
-      location: 'Remote',
-      matchScore: 0.85,
-      experience: '6 years',
+      id: 3, name: 'Mike Johnson', email: 'mike.j@email.com', phone: '+1 234-567-8902',
+      location: 'Remote', matchScore: 0.85, experience: '6 years',
       skills: ['Python', 'FastAPI', 'PostgreSQL', 'Docker', 'Kubernetes'],
-      education: 'M.S. Software Engineering',
-      appliedDate: '2024-01-17',
-      status: 'Interview Scheduled',
-      jobApplied: 'Backend Engineer'
-    },
-    {
-      id: 4,
-      name: 'Emily Davis',
-      email: 'emily.davis@email.com',
-      phone: '+1 234-567-8903',
-      location: 'Austin, TX',
-      matchScore: 0.78,
-      experience: '3 years',
-      skills: ['React', 'TypeScript', 'Node.js', 'SQL', 'AWS'],
-      education: 'B.S. Computer Engineering',
-      appliedDate: '2024-01-18',
-      status: 'New',
-      jobApplied: 'Senior Full Stack Developer'
-    },
-    {
-      id: 5,
-      name: 'David Chen',
-      email: 'david.chen@email.com',
-      phone: '+1 234-567-8904',
-      location: 'Seattle, WA',
-      matchScore: 0.91,
-      experience: '7 years',
-      skills: ['Kubernetes', 'Docker', 'AWS', 'Terraform', 'Jenkins'],
-      education: 'B.S. Computer Science',
-      appliedDate: '2024-01-19',
-      status: 'Reviewed',
-      jobApplied: 'DevOps Engineer'
+      education: 'M.S. Software Engineering', appliedDate: '2024-01-17',
+      status: 'Interview Scheduled', jobApplied: 'Backend Engineer'
     },
   ];
 
@@ -124,22 +161,8 @@ const RecruiterDashboard = () => {
     totalJobs: mockJobs.length,
     totalApplicants: 105,
     avgMatchScore: 78,
-    activeJobs: mockJobs.length
+    activeJobs: mockJobs.filter(j => j.status === 'active').length
   };
-
-  const chartData = [
-    { name: 'Strong Match', value: 30, color: '#10b981' },
-    { name: 'Good Match', value: 45, color: '#f59e0b' },
-    { name: 'Weak Match', value: 30, color: '#ef4444' },
-  ];
-
-  const skillsData = [
-    { skill: 'React', count: 38 },
-    { skill: 'Python', count: 42 },
-    { skill: 'Node.js', count: 35 },
-    { skill: 'SQL', count: 40 },
-    { skill: 'Docker', count: 28 },
-  ];
 
   const getMatchColor = (score) => {
     if (score >= 0.8) return 'text-green-600 bg-green-100';
@@ -158,35 +181,16 @@ const RecruiterDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Bar */}
-      <div className="bg-blue-600 text-white py-3 sm:py-4 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 flex justify-between items-center">
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-full flex items-center justify-center">
-              <Briefcase className="w-5 h-5 sm:w-7 sm:h-7 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-xl font-bold">Welcome back, Kankav!</h1>
-              <p className="text-blue-100 text-xs sm:text-sm">Recruiter Dashboard</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="lg:hidden p-2 hover:bg-blue-700 rounded-lg transition-colors"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={handleLogout}
-              className="hidden sm:flex items-center space-x-2 px-3 sm:px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors text-sm"
-            >
-              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <DashboardNavbar 
+  userType="recruiter"
+  userName={user?.name || 'Recruiter'}
+  onLogout={handleLogout}
+  onMenuToggle={() => setShowMobileMenu(!showMobileMenu)}
+  showMobileMenu={showMobileMenu}
+/>
+
+
+
 
       {/* Mobile Menu Overlay */}
       {showMobileMenu && (
@@ -212,7 +216,7 @@ const RecruiterDashboard = () => {
 
             <nav className="space-y-2">
               <button
-                onClick={() => { setActiveTab('overview'); setShowMobileMenu(false); }}
+                onClick={() => { handleTabChange('overview'); setShowMobileMenu(false); }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                   activeTab === 'overview' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
                 }`}
@@ -221,7 +225,7 @@ const RecruiterDashboard = () => {
                 <span className="font-medium">Dashboard</span>
               </button>
               <button
-                onClick={() => { setActiveTab('jobs'); setShowMobileMenu(false); }}
+                onClick={() => { handleTabChange('jobs'); setShowMobileMenu(false); }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                   activeTab === 'jobs' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
                 }`}
@@ -229,26 +233,7 @@ const RecruiterDashboard = () => {
                 <Briefcase className="w-5 h-5" />
                 <span className="font-medium">My Jobs</span>
               </button>
-              <button
-                onClick={() => { setActiveTab('analytics'); setShowMobileMenu(false); }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                  activeTab === 'analytics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <BarChart3 className="w-5 h-5" />
-                <span className="font-medium">Analytics</span>
-              </button>
             </nav>
-            
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <button 
-                onClick={handleLogout}
-                className="w-full flex items-center space-x-2 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-                <span className="font-medium">Logout</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -270,7 +255,7 @@ const RecruiterDashboard = () => {
             <div className="bg-white rounded-xl shadow-sm p-4">
               <nav className="space-y-2">
                 <button
-                  onClick={() => setActiveTab('overview')}
+                  onClick={() => handleTabChange('overview')}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                     activeTab === 'overview' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
                   }`}
@@ -279,22 +264,13 @@ const RecruiterDashboard = () => {
                   <span className="font-medium">Dashboard</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab('jobs')}
+                  onClick={() => handleTabChange('jobs')}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                     activeTab === 'jobs' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   <Briefcase className="w-5 h-5" />
                   <span className="font-medium">My Jobs</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('analytics')}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                    activeTab === 'analytics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <BarChart3 className="w-5 h-5" />
-                  <span className="font-medium">Analytics</span>
                 </button>
               </nav>
             </div>
@@ -309,93 +285,44 @@ const RecruiterDashboard = () => {
                 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                  <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                    <div className="flex flex-col space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-gray-600 text-xs sm:text-sm">Total Jobs</p>
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                        </div>
-                      </div>
-                      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{mockStats.totalJobs}</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                    <div className="flex flex-col space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-gray-600 text-xs sm:text-sm">Applicants</p>
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-full flex items-center justify-center">
-                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                        </div>
-                      </div>
-                      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{mockStats.totalApplicants}</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                    <div className="flex flex-col space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-gray-600 text-xs sm:text-sm">Avg Match</p>
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                          <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                        </div>
-                      </div>
-                      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{mockStats.avgMatchScore}%</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                    <div className="flex flex-col space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-gray-600 text-xs sm:text-sm">Active</p>
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                          <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
-                        </div>
-                      </div>
-                      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{mockStats.activeJobs}</p>
-                    </div>
-                  </div>
+                  <StatCard 
+                    title="Total Jobs" 
+                    value={mockStats.totalJobs} 
+                    icon={Briefcase}
+                    bgColor="bg-blue-100"
+                    iconColor="text-blue-600"
+                  />
+                  <StatCard 
+                    title="Applicants" 
+                    value={mockStats.totalApplicants} 
+                    icon={Users}
+                    bgColor="bg-green-100"
+                    iconColor="text-green-600"
+                  />
+                  <StatCard 
+                    title="Avg Match" 
+                    value={`${mockStats.avgMatchScore}%`} 
+                    icon={TrendingUp}
+                    bgColor="bg-purple-100"
+                    iconColor="text-purple-600"
+                  />
+                  <StatCard 
+                    title="Active Jobs" 
+                    value={mockStats.activeJobs} 
+                    icon={FileText}
+                    bgColor="bg-yellow-100"
+                    iconColor="text-yellow-600"
+                  />
                 </div>
 
-                {/* Charts */}
+                {/* Analytics Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Match Distribution</h2>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={chartData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={60}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Top Skills</h2>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={skillsData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="skill" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#3b82f6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <MatchDistributionChart />
+                  <TopSkillsChart />
                 </div>
+
+                {/* Overall Pipeline */}
+                <AnalyticsPipeline />
               </div>
             )}
 
@@ -406,53 +333,12 @@ const RecruiterDashboard = () => {
                 
                 <div className="space-y-3 sm:space-y-4">
                   {mockJobs.map((job) => (
-                    <div key={job.id} className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                      <div className="flex justify-between items-start mb-3 sm:mb-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 truncate">{job.title}</h3>
-                          <p className="text-gray-600 text-xs sm:text-sm">Posted on {new Date(job.created).toLocaleDateString()}</p>
-                        </div>
-                        <div className="flex space-x-1 sm:space-x-2 ml-2">
-                          <button 
-                            onClick={() => {
-                              setSelectedJob(job);
-                              setActiveTab('candidates');
-                            }}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          >
-                            <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
-                          <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                            <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-3 sm:mb-4">
-                        <div className="text-center p-2 sm:p-3 bg-gray-50 rounded-lg">
-                          <p className="text-lg sm:text-2xl font-bold text-gray-900">{job.applicants}</p>
-                          <p className="text-xs sm:text-sm text-gray-600">Total</p>
-                        </div>
-                        <div className="text-center p-2 sm:p-3 bg-green-50 rounded-lg">
-                          <p className="text-lg sm:text-2xl font-bold text-green-600">{job.strongMatches}</p>
-                          <p className="text-xs sm:text-sm text-gray-600">Strong</p>
-                        </div>
-                        <div className="text-center p-2 sm:p-3 bg-yellow-50 rounded-lg">
-                          <p className="text-lg sm:text-2xl font-bold text-yellow-600">{job.goodMatches}</p>
-                          <p className="text-xs sm:text-sm text-gray-600">Good</p>
-                        </div>
-                      </div>
-                      
-                      <button 
-                        onClick={() => {
-                          setSelectedJob(job);
-                          setActiveTab('candidates');
-                        }}
-                        className="w-full px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base font-medium"
-                      >
-                        View Candidates
-                      </button>
-                    </div>
+                    <JobCard 
+                      key={job.id}
+                      job={job}
+                      onViewDetails={handleViewJobDetails}
+                      onEdit={handleEditJob}
+                    />
                   ))}
                 </div>
               </div>
@@ -536,150 +422,25 @@ const RecruiterDashboard = () => {
                 </div>
               </div>
             )}
-
-            {/* Analytics Tab */}
-            {activeTab === 'analytics' && (
-              <div className="space-y-4 sm:space-y-6">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Analytics & Insights</h1>
-                
-                <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Hiring Pipeline</h2>
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <span className="text-gray-700 text-sm sm:text-base">Applied</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1 sm:w-48 lg:w-64 h-3 sm:h-4 bg-gray-200 rounded-full">
-                          <div className="h-3 sm:h-4 bg-blue-600 rounded-full" style={{ width: '100%' }}></div>
-                        </div>
-                        <span className="text-gray-900 font-semibold text-sm sm:text-base w-8 text-right">105</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <span className="text-gray-700 text-sm sm:text-base">Screened</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1 sm:w-48 lg:w-64 h-3 sm:h-4 bg-gray-200 rounded-full">
-                          <div className="h-3 sm:h-4 bg-green-600 rounded-full" style={{ width: '60%' }}></div>
-                        </div>
-                        <span className="text-gray-900 font-semibold text-sm sm:text-base w-8 text-right">63</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <span className="text-gray-700 text-sm sm:text-base">Interviewed</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1 sm:w-48 lg:w-64 h-3 sm:h-4 bg-gray-200 rounded-full">
-                          <div className="h-3 sm:h-4 bg-yellow-600 rounded-full" style={{ width: '30%' }}></div>
-                        </div>
-                        <span className="text-gray-900 font-semibold text-sm sm:text-base w-8 text-right">32</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <span className="text-gray-700 text-sm sm:text-base">Offered</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1 sm:w-48 lg:w-64 h-3 sm:h-4 bg-gray-200 rounded-full">
-                          <div className="h-3 sm:h-4 bg-purple-600 rounded-full" style={{ width: '15%' }}></div>
-                        </div>
-                        <span className="text-gray-900 font-semibold text-sm sm:text-base w-8 text-right">16</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </main>
         </div>
       </div>
 
-      {/* Job Creation Modal */}
-      {showJobModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowJobModal(false)}
-          />
-          
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 lg:p-8">
-            <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Post New Job</h2>
-              <button
-                onClick={() => setShowJobModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-            </div>
+      <CreateJobModal 
+        isOpen={showJobModal}
+        onClose={() => {
+          setShowJobModal(false);
+          setEditingJob(null);
+        }}
+        onSubmit={handleJobSubmit}
+        initialData={editingJob}
+      />
 
-            <form onSubmit={handleJobSubmit} className="space-y-3 sm:space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Job Title *</label>
-                <input
-                  type="text"
-                  value={jobForm.title}
-                  onChange={(e) => setJobForm({ ...jobForm, title: e.target.value })}
-                  required
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                  placeholder="e.g., Senior Full Stack Developer"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
-                <textarea
-                  value={jobForm.description}
-                  onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
-                  required
-                  rows="6"
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                  placeholder="Describe the role, responsibilities, required skills, and qualifications..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Location *</label>
-                  <input
-                    type="text"
-                    value={jobForm.location}
-                    onChange={(e) => setJobForm({ ...jobForm, location: e.target.value })}
-                    required
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                    placeholder="e.g., Remote, New York"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Job Type *</label>
-                  <select
-                    value={jobForm.type}
-                    onChange={(e) => setJobForm({ ...jobForm, type: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                  >
-                    <option>Full-time</option>
-                    <option>Part-time</option>
-                    <option>Contract</option>
-                    <option>Internship</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-3 sm:pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 sm:py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base"
-                >
-                  Post Job
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowJobModal(false)}
-                  className="flex-1 py-2.5 sm:py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors text-sm sm:text-base"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <JobDetailsModal 
+        isOpen={showJobDetailsModal}
+        onClose={() => setShowJobDetailsModal(false)}
+        job={selectedJob}
+      />
     </div>
   );
 };
