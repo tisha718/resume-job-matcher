@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.db.session import get_db
-from app.db.models import Application # make sure this exists
+from app.db.models import Application , User # make sure this exists
 
 router = APIRouter(
     prefix="/analytics",
@@ -188,13 +188,52 @@ def update_application_status(
 
 # WHOLE status update for a particular job
 
+# @router.get("/{job_id}/applications")
+# def get_applications_for_job(
+#     job_id: int,
+#     db: Session = Depends(get_db)
+# ):
+#     applications = (
+#         db.query(Application)
+#         .filter(Application.job_id == job_id)
+#         .all()
+#     )
+
+#     if not applications:
+#         raise HTTPException(
+#             status_code=404,
+#             detail="No applications found for this job"
+#         )
+
+#     application_list = []
+
+#     for app in applications:
+#         application_list.append({
+#             "user_id": app.user_id,
+#             "job_id": app.job_id,
+#             "fit_score": app.fit_score,
+#             "skill_score": app.skill_score,
+#             "semantic_score": app.semantic_score,
+#             "matched_skills": app.matched_skills,
+#             "missing_skills": app.missing_skills,
+#             "application_status": app.application_status,
+#             "applied_at": app.applied_at
+#         })
+
+#     return {
+#         "job_id": job_id,
+#         "total_applications": len(application_list),
+#         "applications": application_list
+#     }
+
 @router.get("/{job_id}/applications")
 def get_applications_for_job(
     job_id: int,
     db: Session = Depends(get_db)
 ):
     applications = (
-        db.query(Application)
+        db.query(Application, User)
+        .join(User, Application.user_id == User.id)
         .filter(Application.job_id == job_id)
         .all()
     )
@@ -207,9 +246,12 @@ def get_applications_for_job(
 
     application_list = []
 
-    for app in applications:
+    for app, user in applications:
         application_list.append({
             "user_id": app.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+
             "job_id": app.job_id,
             "fit_score": app.fit_score,
             "skill_score": app.skill_score,
