@@ -196,15 +196,23 @@ async def show_applied_jobs(user_id: int, db: Session = Depends(get_db)):
         )
     return apps
 
-@router.delete("/{application_id}/hard", summary="Hard delete an application", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{application_id}/hard",
+    summary="Hard delete an application",
+    status_code=status.HTTP_200_OK
+)
 async def delete_application_hard(
     application_id: int = Path(..., gt=0),
     db: Session = Depends(get_db),
     # current_user = Depends(get_current_user),
 ):
     application = db.get(Application, application_id)
+
     if application is None:
-        raise HTTPException(status_code=404, detail=f"Application {application_id} not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Application {application_id} not found"
+        )
 
     # assert_candidate_owns_application(application, current_user.id)
 
@@ -219,6 +227,13 @@ async def delete_application_hard(
         )
     except SQLAlchemyError:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to delete application")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete application"
+        )
 
-    return
+    return {
+        "message": "Application deleted successfully",
+        "application_id": application_id,
+        "status": "deleted"
+    }
