@@ -187,19 +187,19 @@ def update_application_status(
     }
 
 # WHOLE status update for a particular job
+
 @router.get("/{job_id}/applications")
 def get_applications_for_job(
     job_id: int,
     db: Session = Depends(get_db)
 ):
-    results = (
-        db.query(Application, User)
-        .join(User, User.id == Application.user_id)
+    applications = (
+        db.query(Application)
         .filter(Application.job_id == job_id)
         .all()
     )
 
-    if not results:
+    if not applications:
         raise HTTPException(
             status_code=404,
             detail="No applications found for this job"
@@ -207,12 +207,9 @@ def get_applications_for_job(
 
     application_list = []
 
-    for app, user in results:
+    for app in applications:
         application_list.append({
-            "user_id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
+            "user_id": app.user_id,
             "job_id": app.job_id,
             "fit_score": app.fit_score,
             "skill_score": app.skill_score,

@@ -130,11 +130,6 @@ export const MatchDistributionChart = () => {
       name: 'Good Match',
       value: fitData.fit_score_distribution?.['good (60-79)'] || 0,
       color: '#f59e0b'
-    },
-    {
-      name: 'Average',
-      value: fitData.fit_score_distribution?.['average (<60)'] || 0,
-      color: '#ef4444'
     }
   ];
 
