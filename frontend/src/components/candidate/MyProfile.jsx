@@ -55,25 +55,37 @@ const MyProfile = ({ onDeleteResume }) => {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const userId = userData.id || userData.user_id || 1;
 
-      // TODO: Replace with actual API endpoint when ready
-      // const response = await resumeAPI.downloadResume(resumeId, userId);
-      
-      // Placeholder for future implementation
-      console.log('Download resume:', resumeId);
-      
-      // Example implementation when endpoint is ready:
-      /*
+      // Call the download API
       const response = await resumeAPI.downloadResume(resumeId, userId);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      
+      // Create blob from response
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || 'application/pdf' 
+      });
+      
+      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = resume.filename || 'resume.pdf';
+      
+      // Extract filename from content-disposition header or use default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = resume.filename || 'resume.pdf';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
+      
+      // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      */
       
     } catch (err) {
       setError(

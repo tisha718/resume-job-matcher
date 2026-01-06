@@ -79,6 +79,14 @@ export const resumeAPI = {
     return api.delete(`/api/candidate/resume/${resumeId}?user_id=${userId}`);
   },
 
+  // Download resume
+  downloadResume: (resumeId, userId) => {
+    return api.get(`/api/candidate/resume/${resumeId}/download`, {
+      params: { user_id: userId },
+      responseType: 'blob', // Important for file downloads
+    });
+  },
+
   // Extract skills from resume (stateless)
   extractSkills: async (file) => {
     const formData = new FormData();
