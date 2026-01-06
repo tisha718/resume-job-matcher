@@ -123,11 +123,13 @@ export const candidateAPI = {
 
 // Recruiter APIs
 export const recruiterAPI = {
-  createJob: (data) => api.post('/recruiter/jobs', data),
-  getJobs: () => api.get('/recruiter/jobs'),
-  getJobCandidates: (jobId) => api.get(`/recruiter/jobs/${jobId}/candidates`),
-  getDashboardStats: () => api.get('/recruiter/dashboard/stats'),
-  generateQuestions: (jobId) => api.post(`/recruiter/jobs/${jobId}/interview-questions`),
+  createJob: (data) => api.post('/api/recruiter/jobs', data),
+  getJobs: () => api.get('/api/recruiter/jobs'),
+  // NEW: fetch by recruiter id from your FastAPI route
+  getJobsByRecruiter: (recruiterId) => api.get(`/api/recruiter/jobs/by-recruiter/10`),
+  getJobCandidates: (jobId) => api.get(`/api/recruiter/jobs/${jobId}/candidates`),
+  getDashboardStats: () => api.get('/api/recruiter/dashboard/stats'),
+  generateQuestions: (jobId) => api.post(`/api/recruiter/jobs/${jobId}/interview-questions`),
 };
 
 export default api;

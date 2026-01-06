@@ -11,11 +11,60 @@ import { useAuth } from '../../context/AuthContext';
 import JobCard from './JobCardWithApplicants';
 import JobDetailsModal from './JobDetailsModal';
 import { AnalyticsPipeline, MatchDistributionChart, TopSkillsChart } from './AnalyticsComponents';
+import { recruiterAPI } from '../../services/api';
 
 const RecruiterDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  
+  // NEW: real jobs state
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [jobsError, setJobsError] = useState('');
+
+  
+// Determine recruiterId
+  // Option A: from user context (preferred if available)
+  const recruiterId = user?.id || user?.recruiter_id || 10; // fallback to 10 for now
+
+  // Fetch jobs on mount / when recruiterId changes
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setJobsLoading(true);
+      setJobsError('');
+      try {
+        const { data } = await recruiterAPI.getJobsByRecruiter(recruiterId);
+        // data is an array from FastAPI, transform to frontend shape:
+        
+        const mapped = (data || []).map(j => ({
+          id: j.id,
+          title: j.title,
+          companyName: j.company,
+          description: j.description,
+          location: j.location,
+          type: j.job_type,
+          status: j.job_status,
+          created: j.created_at?.slice(0, 10), // YYYY-MM-DD
+          applicants: 0,
+          strongMatches: 0,
+          goodMatches: 0,
+        }));
+        setJobs(mapped);
+      } catch (err) {
+        console.error('Failed to load jobs', err);
+        setJobsError(
+          err?.response?.data?.detail ||
+          err?.message ||
+          'Failed to load jobs. Please try again.'
+        );
+      } finally {
+        setJobsLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, []);
 
   
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
@@ -90,49 +139,8 @@ const RecruiterDashboard = () => {
     setShowJobDetailsModal(true);
   };
 
-  // Mock data
-  const mockJobs = [
-    { 
-      id: 1, 
-      title: 'Senior Full Stack Developer', 
-      companyName: 'TechCorp Inc.',
-      description: 'We are looking for an experienced Full Stack Developer to join our team...',
-      location: 'San Francisco, CA',
-      type: 'Full-time',
-      applicants: 45, 
-      strongMatches: 12, 
-      goodMatches: 18, 
-      created: '2024-01-15', 
-      status: 'active' 
-    },
-    { 
-      id: 2, 
-      title: 'Backend Engineer', 
-      companyName: 'StartupXYZ',
-      description: 'Join our backend team to build scalable microservices...',
-      location: 'Remote',
-      type: 'Full-time',
-      applicants: 32, 
-      strongMatches: 8, 
-      goodMatches: 15, 
-      created: '2024-01-20', 
-      status: 'active' 
-    },
-    { 
-      id: 3, 
-      title: 'DevOps Engineer', 
-      companyName: 'CloudSystems Ltd.',
-      description: 'Help us build and maintain our cloud infrastructure...',
-      location: 'New York, NY',
-      type: 'Contract',
-      applicants: 28, 
-      strongMatches: 10, 
-      goodMatches: 12, 
-      created: '2024-01-22', 
-      status: 'closed' 
-    },
-  ];
 
+  
   const mockCandidates = [
     {
       id: 1, name: 'John Doe', email: 'john.doe@email.com', phone: '+1 234-567-8900',
@@ -157,11 +165,11 @@ const RecruiterDashboard = () => {
     },
   ];
 
-  const mockStats = {
-    totalJobs: mockJobs.length,
-    totalApplicants: 105,
-    avgMatchScore: 78,
-    activeJobs: mockJobs.filter(j => j.status === 'active').length
+  const stats = {
+    totalJobs: jobs.length,
+    totalApplicants: 105, // if you don’t have this yet, keep a placeholder or compute if available
+    avgMatchScore: 78,    // placeholder
+    activeJobs: jobs.filter(j => j.status === 'active').length
   };
 
   const getMatchColor = (score) => {
@@ -284,7 +292,7 @@ const RecruiterDashboard = () => {
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard Overview</h1>
                 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                   <StatCard 
                     title="Total Jobs" 
                     value={mockStats.totalJobs} 
@@ -313,7 +321,7 @@ const RecruiterDashboard = () => {
                     bgColor="bg-yellow-100"
                     iconColor="text-yellow-600"
                   />
-                </div>
+                </div> */}
 
                 {/* Analytics Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -326,14 +334,22 @@ const RecruiterDashboard = () => {
               </div>
             )}
 
+            
             {/* Jobs Tab */}
             {activeTab === 'jobs' && (
               <div className="space-y-4 sm:space-y-6">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Posted Jobs</h1>
-                
+
+                {/* Loading / Error states */}
+                {jobsLoading && <p className="text-gray-600">Loading jobs...</p>}
+                {jobsError && <p className="text-red-600">{jobsError}</p>}
+
                 <div className="space-y-3 sm:space-y-4">
-                  {mockJobs.map((job) => (
-                    <JobCard 
+                  {!jobsLoading && !jobsError && jobs.length === 0 && (
+                    <p className="text-gray-600">No jobs posted yet.</p>
+                  )}
+                  {jobs.map((job) => (
+                    <JobCard
                       key={job.id}
                       job={job}
                       onViewDetails={handleViewJobDetails}
