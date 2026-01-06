@@ -44,43 +44,44 @@ const RecruiterDashboard = () => {
 
 
 
-  // Fetch jobs on mount / when recruiterId changes
-  useEffect(() => {
-    const fetchJobs = async () => {
-      setJobsLoading(true);
-      setJobsError('');
-      try {
-        const { data } = await recruiterAPI.getJobsByRecruiter(recruiterId);
-        // data is an array from FastAPI, transform to frontend shape:
-        
-        const mapped = (data || []).map(j => ({
-          id: j.id,
-          title: j.title,
-          companyName: j.company,
-          description: j.description,
-          location: j.location,
-          type: j.job_type,
-          status: j.job_status,
-          created: j.created_at?.slice(0, 10), // YYYY-MM-DD
-          applicants: 0,
-          strongMatches: 0,
-          goodMatches: 0,
-        }));
-        setJobs(mapped);
-      } catch (err) {
-        console.error('Failed to load jobs', err);
-        setJobsError(
-          err?.response?.data?.detail ||
-          err?.message ||
-          'Failed to load jobs. Please try again.'
-        );
-      } finally {
-        setJobsLoading(false);
-      }
-    };
+  
+  const fetchJobs = async () => {
+    setJobsLoading(true);
+    setJobsError('');
+    try {
+      const { data } = await recruiterAPI.getJobsByRecruiter(recruiterId);
+      const mapped = (data || []).map(j => ({
+        id: j.id,
+        title: j.title,
+        companyName: j.company,
+        description: j.description,
+        location: j.location,
+        type: j.job_type,
+        status: j.job_status,
+        created: j.created_at?.slice(0, 10), // YYYY-MM-DD
+        applicants: 0,
+        strongMatches: 0,
+        goodMatches: 0,
+      }));
+      setJobs(mapped);
+    } catch (err) {
+      console.error('Failed to load jobs', err);
+      setJobsError(
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to load jobs. Please try again.'
+      );
+    } finally {
+      setJobsLoading(false);
+    }
+  };
 
+  
+  // ✅ 2) Call fetchJobs on mount (and whenever recruiterId changes)
+  useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [recruiterId]); // add recruiterId dependency
+
 
   
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
@@ -138,56 +139,59 @@ const RecruiterDashboard = () => {
   const [creatingJob, setCreatingJob] = useState(false); // optional: disable button during submit
   const [createError, setCreateError] = useState('');
 
-  const handleJobSubmit = async (jobData) => {
-    
   
-  // 1) Normalize the field names coming from CreateJobModal
-  const title = jobData?.title;
-  const description = jobData?.description;
-  const company = jobData?.company || jobData?.companyName; // support either key
-  const location = jobData?.location;
-  const job_type = jobData?.job_type || jobData?.type;      // support either key
-  const job_status = jobData?.job_status || jobData?.status; // support either key
+// ✅ 3) Call fetchJobs after successful job creation
+  const handleJobSubmit = async (jobData) => {
+    // normalize and validate fields
+    const title = jobData?.title;
+    const description = jobData?.description;
+    const company = jobData?.company || jobData?.companyName;
+    const location = jobData?.location;
+    const job_type = jobData?.job_type || jobData?.type;
+    const job_status = jobData?.job_status || jobData?.status;
 
-  // 2) Validate required fields (FastAPI expects all)
-  const missing = [];
-  if (!title) missing.push('title');
-  if (!description) missing.push('description');
-  if (!company) missing.push('company');
-  if (!location) missing.push('location');
-  if (!job_type) missing.push('job_type');
-  if (!job_status) missing.push('job_status');
+    const missing = [];
+    if (!title) missing.push('title');
+    if (!description) missing.push('description');
+    if (!company) missing.push('company');
+    if (!location) missing.push('location');
+    if (!job_type) missing.push('job_type');
+    if (!job_status) missing.push('job_status');
 
-  if (missing.length > 0) {
-    alert(`Please fill: ${missing.join(', ')}`);
-    return;
-  }
+    if (missing.length) {
+      alert(`Please fill: ${missing.join(', ')}`);
+      return;
+    }
 
-  // 3) Call API with query params
-  try {
-    const { data } = await recruiterAPI.createJob({
-      recruiter_id: RECRUITER_ID,
-      title,
-      description,
-      company,   // ✅ guaranteed to be present
-      location,
-      job_type,
-      job_status,
-    });
-    alert(data?.message || 'Job created successfully!');
-    setShowJobModal(false);
-    setEditingJob(null);
-    await fetchJobs();       // re-load jobs for recruiter 50
-    setActiveTab('jobs');
-  } catch (err) {
-    console.error('Failed to create job', err);
-    const msg =
-      err?.response?.data?.detail ||
-      err?.message ||
-      'Failed to create job. Please try again.';
-    alert(msg);
-  }
-};
+    try {
+      const { data } = await recruiterAPI.createJob({
+        recruiter_id: recruiterId, // <-- same id as fetch
+        title,
+        description,
+        company,
+        location,
+        job_type,
+        job_status,
+      });
+
+      alert(data?.message || 'Job created successfully!');
+      setShowJobModal(false);
+      setEditingJob(null);
+
+      // 🔁 refresh the list
+      await fetchJobs();
+
+      // Optional: jump to 'jobs' tab to show the update
+      setActiveTab('jobs');
+    } catch (err) {
+      console.error('Failed to create job', err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to create job. Please try again.';
+      alert(msg);
+    }
+  };
 
 
 
