@@ -127,6 +127,50 @@ export const candidateAPI = {
       params: { difficulty: difficulty.toLowerCase() }
     });
   },
+
+  // Get all applied jobs for a user - FIXED PATH
+  getAppliedJobs: (userId) => {
+    return api.get('/api/candidate/api/candidate/applications', {
+      params: { user_id: userId }
+    });
+  },
+
+  // Withdraw application (hard delete)
+  withdrawApplication: (applicationId) => {
+    return api.delete(`/api/candidate/${applicationId}/hard`);
+  },
+
+  // Get job details by job ID
+  getJobDetails: (jobId) => {
+    return api.get(`/api/candidate/api/candidate/jobs/${jobId}`);
+  },
+};
+
+// Application Analytics APIs
+export const applicationAPI = {
+  // Get applications summary for a particular job
+  getApplicationsSummary: (jobId) => {
+    return api.get('/application/analytics/particular-job/applications-summary', {
+      params: { job_id: jobId }
+    });
+  },
+
+  // Get fit score distribution for a job
+  getFitScoreDistribution: (jobId) => {
+    return api.get(`/application/analytics/${jobId}/fit-score-distribution`);
+  },
+
+  // Get all applications for a specific job with detailed scores
+  getApplicationsForJob: (jobId) => {
+    return api.get(`/application/analytics/${jobId}/applications`);
+  },
+
+  // Update application status
+  updateApplicationStatus: (applicationId, status) => {
+    return api.put(`/application/analytics/${applicationId}/status`, null, {
+      params: { status }
+    });
+  },
 };
 
 // Recruiter APIs
@@ -136,6 +180,29 @@ export const recruiterAPI = {
   getJobCandidates: (jobId) => api.get(`/recruiter/jobs/${jobId}/candidates`),
   getDashboardStats: () => api.get('/recruiter/dashboard/stats'),
   generateQuestions: (jobId) => api.post(`/recruiter/jobs/${jobId}/interview-questions`),
+};
+
+// User APIs
+export const userAPI = {
+  // Get user details by user ID
+  getUserDetails: (userId) => {
+    return api.get(`/api/users/${userId}`);
+  },
+  
+  // Batch get multiple users (if your backend supports it)
+  getBatchUserDetails: (userIds) => {
+    return api.post('/api/users/batch', { user_ids: userIds });
+  },
+  
+  // Get user profile
+  getUserProfile: () => {
+    return api.get('/api/users/profile');
+  },
+  
+  // Update user profile
+  updateUserProfile: (data) => {
+    return api.put('/api/users/profile', data);
+  },
 };
 
 export default api;

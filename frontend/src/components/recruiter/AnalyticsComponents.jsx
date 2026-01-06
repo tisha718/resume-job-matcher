@@ -55,7 +55,6 @@ export const AnalyticsPipeline = () => {
       </h2>
 
       <div className="space-y-3 sm:space-y-4">
-
         {[
           ['Total Applications', analytics.total_applications, 'bg-indigo-600', 100],
           ['Applied', analytics.applied, 'bg-blue-600'],
@@ -64,7 +63,10 @@ export const AnalyticsPipeline = () => {
           ['Offered', analytics.offered, 'bg-purple-600'],
           ['Rejected', analytics.rejected, 'bg-red-600'],
         ].map(([label, value, color, fixed]) => (
-          <div key={label} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div
+            key={label}
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+          >
             <span className="text-gray-700 text-sm sm:text-base">{label}</span>
             <div className="flex items-center space-x-2">
               <div className="flex-1 sm:w-48 lg:w-64 h-3 sm:h-4 bg-gray-200 rounded-full">
@@ -98,7 +100,11 @@ export const MatchDistributionChart = () => {
 
   useEffect(() => {
     axios
-      .get('http://127.0.0.1:8001/application/analytics/Overall job fit-score-distribution')
+      .get(
+        encodeURI(
+          'http://127.0.0.1:8001/application/analytics/Overall job fit-score-distribution'
+        )
+      )
       .then(res => setFitData(res.data))
       .catch(err => console.error('Fit score error:', err));
   }, []);
@@ -117,17 +123,17 @@ export const MatchDistributionChart = () => {
   const chartData = [
     {
       name: 'Strong Match',
-      value: fitData.fit_score_distribution['strong (>=80)'],
+      value: fitData.fit_score_distribution?.['strong (>=80)'] || 0,
       color: '#10b981'
     },
     {
       name: 'Good Match',
-      value: fitData.fit_score_distribution['good (60-79)'],
+      value: fitData.fit_score_distribution?.['good (60-79)'] || 0,
       color: '#f59e0b'
     },
     {
-      name: 'Weak Match',
-      value: fitData.fit_score_distribution['average (<60)'],
+      name: 'Average',
+      value: fitData.fit_score_distribution?.['average (<60)'] || 0,
       color: '#ef4444'
     }
   ];
@@ -192,4 +198,3 @@ export const TopSkillsChart = () => {
     </div>
   );
 };
-

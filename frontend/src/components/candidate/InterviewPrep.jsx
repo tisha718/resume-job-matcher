@@ -194,7 +194,7 @@ const InterviewPrep = ({ selectedJob, onClose }) => {
               }}
               className="px-4 py-2 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
             >
-              Generate New Questions
+              Change difficulty level
             </button>
           </div>
 
