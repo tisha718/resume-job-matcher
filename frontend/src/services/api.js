@@ -127,6 +127,20 @@ export const recruiterAPI = {
   getJobs: () => api.get('/api/recruiter/jobs'),
   // NEW: fetch by recruiter id from your FastAPI route
   getJobsByRecruiter: (recruiterId) => api.get(`/api/recruiter/jobs/by-recruiter/10`),
+  
+// ✅ Create Job via query params (empty body)
+  createJob: (payload) =>
+    api.post('/api/recruiter/jobs/new', null, {
+      params: {
+        recruiter_id: payload.recruiter_id,
+        title: payload.title,
+        description: payload.description,
+        company: payload.company,
+        location: payload.location,
+        job_type: payload.job_type,
+        job_status: payload.job_status,
+      },
+    }),
   getJobCandidates: (jobId) => api.get(`/api/recruiter/jobs/${jobId}/candidates`),
   getDashboardStats: () => api.get('/api/recruiter/dashboard/stats'),
   generateQuestions: (jobId) => api.post(`/api/recruiter/jobs/${jobId}/interview-questions`),
