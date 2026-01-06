@@ -1,7 +1,0 @@
-
-fastapi==0.115.5
-uvicorn[standard]==0.32.0
-passlib[bcrypt]==1.7.4
-python-jose==3.3.0
-python-dotenv==1.0.1
-filelock==3.16.0

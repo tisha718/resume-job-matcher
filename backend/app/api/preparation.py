@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from enum import Enum
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.db.models import Job
 from app.core.prompts import build_prompt
 from app.services.question_generator import generate_interview_questions
 
 router = APIRouter(
-    prefix="/api/candidate",
+    prefix="/candidate",
     tags=["Interview Preparation"]
 )
 

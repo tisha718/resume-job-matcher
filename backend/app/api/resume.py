@@ -12,10 +12,10 @@ from app.services.blob_storage import (
     download_resume_from_blob
 )
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.db.models import Resume
 
-router = APIRouter()
+router = APIRouter(tags=["Resume"])
 
 # ------------------------------------------------------------------
 # Existing simple endpoints (DO NOT REMOVE)
@@ -70,7 +70,7 @@ async def extract_resume_skills(file: UploadFile = File(...)):
 # Candidate Resume Management APIs (Azure Blob + PostgreSQL)
 # ------------------------------------------------------------------
 
-@router.post("/api/candidate/upload-resume")
+@router.post("/candidate/upload-resume")
 async def candidate_upload_resume(
     resume: UploadFile = File(...),
     user_id: int = Form(...),
@@ -132,7 +132,7 @@ async def candidate_upload_resume(
         )
 
 
-@router.get("/api/candidate/resumes")
+@router.get("/candidate/resumes")
 def get_all_resumes_for_user(
     user_id: int,
     db: Session = Depends(get_db)
@@ -166,7 +166,7 @@ def get_all_resumes_for_user(
     }
 
 
-@router.delete("/api/candidate/resume/{resume_id}")
+@router.delete("/candidate/resume/{resume_id}")
 def delete_candidate_resume(
     resume_id: int,
     user_id: int,
@@ -204,7 +204,7 @@ def delete_candidate_resume(
     }
 
 
-@router.get("/api/candidate/resume/{resume_id}/download")
+@router.get("/candidate/resume/{resume_id}/download")
 def download_candidate_resume(
     resume_id: int,
     user_id: int,
