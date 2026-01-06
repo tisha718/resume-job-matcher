@@ -11,6 +11,10 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 
+from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, CheckConstraint, func
+
+
 Base = declarative_base()
 
 
@@ -22,12 +26,15 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
+    last_name  = Column(String(100), nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(Text, nullable=False)
     role = Column(String(20), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(TIMESTAMP, server_default=func.now())
 
+    __table_args__ = (
+        CheckConstraint("role IN ('candidate','recruiter')", name="users_role_check"),
+    )
 
 # --------------------------------------------------
 # RESUMES
