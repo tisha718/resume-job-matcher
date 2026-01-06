@@ -189,7 +189,7 @@ const JobCard = ({ job, onViewDetails, onEdit, onViewApplicants, onDelete }) => 
 };
 
 // Main Component with integrated functionality
-const JobCardWithApplicants = ({ job, onViewDetails, onEdit }) => {
+const JobCardWithApplicants = ({ job, onViewDetails, onEdit, onDelete }) => {
   const [showApplicantsView, setShowApplicantsView] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
 
@@ -214,6 +214,7 @@ const JobCardWithApplicants = ({ job, onViewDetails, onEdit }) => {
       onViewDetails={onViewDetails}
       onEdit={onEdit}
       onViewApplicants={handleViewApplicants}
+      onDelete={onDelete}
     />
   );
 };

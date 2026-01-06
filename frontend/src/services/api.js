@@ -154,6 +154,8 @@ export const recruiterAPI = {
       },
     }),
 
+  deleteJob: (jobId) => api.delete(`/api/recruiter/jobs/delete/${jobId}`),
+
   getJobCandidates: (jobId) => api.get(`/api/recruiter/jobs/${jobId}/candidates`),
   getDashboardStats: () => api.get('/api/recruiter/dashboard/stats'),
   generateQuestions: (jobId) => api.post(`/api/recruiter/jobs/${jobId}/interview-questions`),

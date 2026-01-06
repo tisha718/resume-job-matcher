@@ -166,7 +166,7 @@ async def create_job(
     }
 
 
-@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a job posting")
+@router.delete("/jobs/delete/{job_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a job posting")
 async def delete_job(
     job_id: int = Path(..., gt=0, description="Job ID to delete"),
     db: Session = Depends(get_db),

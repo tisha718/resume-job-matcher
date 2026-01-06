@@ -8,10 +8,11 @@ import DashboardNavbar from '../common/DashboardNavbar';
 import StatCard from '../common/StatCard';
 import CreateJobModal from './CreateJobModal';
 import { useAuth } from '../../context/AuthContext';
-import JobCard from './JobCardWithApplicants';
+// import JobCard from './JobCardWithApplicants';
 import JobDetailsModal from './JobDetailsModal';
 import { AnalyticsPipeline, MatchDistributionChart, TopSkillsChart } from './AnalyticsComponents';
 import { recruiterAPI } from '../../services/api';
+import JobCardWithApplicants from './JobCardWithApplicants';
 
 const RecruiterDashboard = () => {
   const location = useLocation();
@@ -252,6 +253,40 @@ const RecruiterDashboard = () => {
     }
   };
 
+  const handleDeleteJob = async (job) => {
+  try {
+      console.log('[Delete] Requesting delete for job id:', job.id);
+      const res = await recruiterAPI.deleteJob(job.id); // DELETE /api/recruiter/{job_id}
+      console.log('[Delete] Response status:', res?.status); // should be 204
+
+      if (res?.status === 204 || res?.status === 200) {
+        // Optimistically remove from UI
+        setJobs((prev) => prev.filter((j) => j.id !== job.id));
+        alert('Job deleted successfully.');
+        // Optional: await fetchJobs(); // ensure consistency
+      } else {
+        alert(`Unexpected delete response status: ${res?.status ?? 'unknown'}`);
+      }
+    } catch (err) {
+      console.error('[Delete] Failed:', err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to delete job. Please try again.';
+      alert(msg);
+    }
+  };
+
+  // In the Jobs tab render:
+  {jobs.map((job) => (
+    <JobCardWithApplicants
+      key={job.id}
+      job={job}
+      onViewDetails={handleViewJobDetails}
+      onEdit={handleEditJob}
+      onDelete={handleDeleteJob}
+    />
+  ))}
 
   
   const mockCandidates = [
@@ -303,12 +338,12 @@ const RecruiterDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardNavbar 
-  userType="recruiter"
-  userName={user?.name || 'Recruiter'}
-  onLogout={handleLogout}
-  onMenuToggle={() => setShowMobileMenu(!showMobileMenu)}
-  showMobileMenu={showMobileMenu}
-/>
+      userType="recruiter"
+      userName={user?.name || 'Recruiter'}
+      onLogout={handleLogout}
+      onMenuToggle={() => setShowMobileMenu(!showMobileMenu)}
+      showMobileMenu={showMobileMenu}
+    />
 
 
 
@@ -473,11 +508,12 @@ const RecruiterDashboard = () => {
                     <p className="text-gray-600">No jobs posted yet.</p>
                   )}
                   {jobs.map((job) => (
-                    <JobCard
+                    <JobCardWithApplicants
                       key={job.id}
                       job={job}
                       onViewDetails={handleViewJobDetails}
                       onEdit={handleEditJob}
+                      onDelete={handleDeleteJob}
                     />
                   ))}
                 </div>
