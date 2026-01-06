@@ -26,42 +26,48 @@ const Signup = () => {
     setError('');
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+  if (formData.password !== formData.confirmPassword) {
+    setError('Passwords do not match');
+    return;
+  }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
+  setLoading(true);
 
-    setLoading(true);
+  try {
+    const res = await authAPI.signup({
+      firstname: formData.firstName,
+      lastname: formData.lastName,
+      email: formData.email,
+      password: formData.password,
+      role: formData.role,
+    });
 
-    // Mock signup - works without backend
-    setTimeout(() => {
-      const mockUser = {
-        name: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        role: formData.role
-      };
-      
-      login(mockUser);
-      
-      // Redirect based on role
-      if (mockUser.role === 'candidate') {
-        navigate('/candidate/dashboard');
-      } else {
-        navigate('/recruiter/dashboard');
-      }
-      setLoading(false);
-    }, 1000);
-  };
+    const token = res.data.access_token;
+
+    const user = {
+      email: formData.email,
+      role: formData.role,
+      name: `${formData.firstName} ${formData.lastName}`,
+    };
+
+    login(user, token);
+
+    navigate(
+      user.role === 'candidate'
+        ? '/candidate/dashboard'
+        : '/recruiter/dashboard'
+    );
+  } catch (err) {
+    setError(err.response?.data?.detail || 'Signup failed');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

@@ -16,31 +16,36 @@ const Login = () => {
     setError('');
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
 
-    // Mock login
-    setTimeout(() => {
-      // Create mock user based on email
-      const mockUser = {
-        email: formData.email,
-        name: formData.email.split('@')[0],
-        role: formData.email.includes('recruiter') ? 'recruiter' : 'candidate'
-      };
-      
-      login(mockUser);
-      
-      // Redirect based on role
-      if (mockUser.role === 'candidate') {
-        navigate('/candidate/dashboard');
-      } else {
-        navigate('/recruiter/dashboard');
-      }
-      setLoading(false);
-    }, 1000);
-  };
+  try {
+    const payload = new URLSearchParams();
+    payload.append('username', formData.email); // IMPORTANT: username, not email
+    payload.append('password', formData.password);
+
+    const res = await authAPI.login(payload);
+
+    const token = res.data.access_token;
+
+    const user = {
+      email: formData.email,
+      role: 'candidate', // backend controls role in token
+      name: formData.email.split('@')[0],
+    };
+
+    login(user, token);
+
+    navigate('/candidate/dashboard');
+  } catch (err) {
+    setError('Invalid email or password');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
