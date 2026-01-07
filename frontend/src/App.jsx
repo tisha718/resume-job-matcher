@@ -33,7 +33,7 @@ function App() {
             
             {/* Protected Routes - Recruiter */}
             <Route 
-              path="/recruiter/dashboard" 
+              path="/recruiter-dashboard"
               element={
                 <ProtectedRoute role="recruiter">
                   <RecruiterDashboard />

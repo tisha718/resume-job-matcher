@@ -24,12 +24,7 @@ const RecruiterDashboard = () => {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsError, setJobsError] = useState('');
   
-// Static recruiter id for now
-  const RECRUITER_ID = 10; // use 50 to match your create example
-
-// Determine recruiterId
-  // Option A: from user context (preferred if available)
-  const recruiterId = user?.id || user?.recruiter_id || 10; // fallback to 10 for now
+  const recruiterId = 10; // TEMP until backend returns recruiter_id in JWT
 
 
   // Open edit for a specific job
@@ -129,13 +124,11 @@ const RecruiterDashboard = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('user');
-    sessionStorage.clear();
-    navigate('/login', { replace: true });
-  };
+  const handleLogout = async () => {
+  await logout();
+  navigate('/login', { replace: true });
+};
+
   
   const [creatingJob, setCreatingJob] = useState(false); // optional: disable button during submit
   const [createError, setCreateError] = useState('');

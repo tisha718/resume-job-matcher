@@ -1,19 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.db.session import get_db
-from app.db.models import Application , User # make sure this exists
+from app.db.models import Application, User
+from app.auth.deps import get_current_user
+from app.auth.security import TokenData
+
 
 router = APIRouter(
     prefix="/analytics",
-    tags=["Analytics"]
+    tags=["Analytics"],
 )
 
-# TOTAL APPLICATIONS & STATUS COUNTS   
- 
+# ==================================================
+# 🔐 Helper: recruiter-only guard
+# ==================================================
+def ensure_recruiter(current_user: TokenData):
+    if current_user.scope != "recruiter":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Recruiter access required",
+        )
+
+
+# ==================================================
+# 1️⃣ OVERALL APPLICATION SUMMARY
+# ==================================================
 @router.get("/summary")
-def dashboard_summary(db: Session = Depends(get_db)):
+def dashboard_summary(
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user),
+):
+    ensure_recruiter(current_user)
+
     total = db.query(Application).count()
 
     status_counts = (
@@ -22,29 +42,33 @@ def dashboard_summary(db: Session = Depends(get_db)):
         .all()
     )
 
-    # Default values
-    response = { 
+    response = {
         "total_applications": total,
         "applied": 0,
         "shortlisted": 0,
         "interviewed": 0,
         "offered": 0,
-        "rejected": 0
+        "rejected": 0,
     }
 
-    for status, count in status_counts:
-        if status in response:
-            response[status] = count
+    for status_name, count in status_counts:
+        if status_name in response:
+            response[status_name] = count
 
     return response
 
-# TOTAL APPLICATIONS & STATUS COUNTS FOR A PARTICULAR JOB
 
+# ==================================================
+# 2️⃣ APPLICATION SUMMARY FOR A PARTICULAR JOB
+# ==================================================
 @router.get("/particular-job/applications-summary")
 def get_particular_job_application_summary(
-    job_id: int,
-    db: Session = Depends(get_db)
+    job_id: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user),
 ):
+    ensure_recruiter(current_user)
+
     total = (
         db.query(Application)
         .filter(Application.job_id == job_id)
@@ -52,10 +76,7 @@ def get_particular_job_application_summary(
     )
 
     status_counts = (
-        db.query(
-            Application.application_status,
-            func.count(Application.id)
-        )
+        db.query(Application.application_status, func.count(Application.id))
         .filter(Application.job_id == job_id)
         .group_by(Application.application_status)
         .all()
@@ -68,19 +89,26 @@ def get_particular_job_application_summary(
         "shortlisted": 0,
         "interviewed": 0,
         "offered": 0,
-        "rejected": 0
+        "rejected": 0,
     }
 
-    for status, count in status_counts:
-        if status in response:
-            response[status] = count
+    for status_name, count in status_counts:
+        if status_name in response:
+            response[status_name] = count
 
     return response
 
-# OVERALL JOB FIT-SCORE DISTRIBUTION
 
-@router.get("/Overall job fit-score-distribution")
-def fit_score_distribution(db: Session = Depends(get_db)):
+# ==================================================
+# 3️⃣ OVERALL FIT SCORE DISTRIBUTION (ALL JOBS)
+# ==================================================
+@router.get("/overall-job-fit-score-distribution")
+def overall_fit_score_distribution(
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user),
+):
+    ensure_recruiter(current_user)
+
     applications = db.query(Application).all()
 
     strong = 0
@@ -98,18 +126,24 @@ def fit_score_distribution(db: Session = Depends(get_db)):
     return {
         "total_applications": len(applications),
         "fit_score_distribution": {
-            "strong (>=80)": strong,
-            "good (60-79)": good
-        }
+            "strong": strong,
+            "good": good,
+            "average": average,
+        },
     }
 
-# JOB-WISE FIT-SCORE DISTRIBUTION
 
+# ==================================================
+# 4️⃣ JOB-WISE FIT SCORE DISTRIBUTION
+# ==================================================
 @router.get("/{job_id}/fit-score-distribution")
 def job_fit_score_distribution(
-    job_id: int,
-    db: Session = Depends(get_db)
+    job_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user),
 ):
+    ensure_recruiter(current_user)
+
     applications = (
         db.query(Application)
         .filter(Application.job_id == job_id)
@@ -119,7 +153,7 @@ def job_fit_score_distribution(
     if not applications:
         raise HTTPException(
             status_code=404,
-            detail="No applications found for this job"
+            detail="No applications found for this job",
         )
 
     strong = 0
@@ -134,31 +168,36 @@ def job_fit_score_distribution(
     return {
         "job_id": job_id,
         "fit_score_distribution": {
-            "strong (>=80)": strong,
-            "good (60-79)": good
-        }
+            "strong": strong,
+            "good": good,
+        },
     }
 
-# UPDATE APPLICATION STATUS
 
+# ==================================================
+# 5️⃣ UPDATE APPLICATION STATUS
+# ==================================================
 @router.put("/{application_id}/status")
 def update_application_status(
-    application_id: int,
-    status: str,
-    db: Session = Depends(get_db)
+    application_id: int = Path(..., gt=0),
+    status: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user),
 ):
+    ensure_recruiter(current_user)
+
     allowed_statuses = [
         "applied",
         "shortlisted",
         "interviewed",
         "offered",
-        "rejected"
+        "rejected",
     ]
 
     if status not in allowed_statuses:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status. Allowed values: {allowed_statuses}"
+            detail=f"Invalid status. Allowed values: {allowed_statuses}",
         )
 
     application = (
@@ -170,7 +209,7 @@ def update_application_status(
     if not application:
         raise HTTPException(
             status_code=404,
-            detail="Application not found"
+            detail="Application not found",
         )
 
     old_status = application.application_status
@@ -183,75 +222,41 @@ def update_application_status(
         "application_id": application_id,
         "old_status": old_status,
         "new_status": status,
-        "message": "Application status updated successfully"
+        "message": "Application status updated successfully",
     }
 
-# WHOLE status update for a particular job
 
-# @router.get("/{job_id}/applications")
-# def get_applications_for_job(
-#     job_id: int,
-#     db: Session = Depends(get_db)
-# ):
-#     applications = (
-#         db.query(Application)
-#         .filter(Application.job_id == job_id)
-#         .all()
-#     )
-
-#     if not applications:
-#         raise HTTPException(
-#             status_code=404,
-#             detail="No applications found for this job"
-#         )
-
-#     application_list = []
-
-#     for app in applications:
-#         application_list.append({
-#             "user_id": app.user_id,
-#             "job_id": app.job_id,
-#             "fit_score": app.fit_score,
-#             "skill_score": app.skill_score,
-#             "semantic_score": app.semantic_score,
-#             "matched_skills": app.matched_skills,
-#             "missing_skills": app.missing_skills,
-#             "application_status": app.application_status,
-#             "applied_at": app.applied_at
-#         })
-
-#     return {
-#         "job_id": job_id,
-#         "total_applications": len(application_list),
-#         "applications": application_list
-#     }
-
+# ==================================================
+# 6️⃣ GET ALL APPLICATIONS FOR A JOB (WITH USER DETAILS)
+# ==================================================
 @router.get("/{job_id}/applications")
 def get_applications_for_job(
-    job_id: int,
-    db: Session = Depends(get_db)
+    job_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user),
 ):
-    applications = (
+    ensure_recruiter(current_user)
+
+    results = (
         db.query(Application, User)
         .join(User, Application.user_id == User.id)
         .filter(Application.job_id == job_id)
         .all()
     )
 
-    if not applications:
+    if not results:
         raise HTTPException(
             status_code=404,
-            detail="No applications found for this job"
+            detail="No applications found for this job",
         )
 
-    application_list = []
+    applications = []
 
-    for app, user in applications:
-        application_list.append({
-            "user_id": app.user_id,
+    for app, user in results:
+        applications.append({
+            "user_id": user.id,
             "first_name": user.first_name,
             "last_name": user.last_name,
-
             "job_id": app.job_id,
             "fit_score": app.fit_score,
             "skill_score": app.skill_score,
@@ -259,11 +264,11 @@ def get_applications_for_job(
             "matched_skills": app.matched_skills,
             "missing_skills": app.missing_skills,
             "application_status": app.application_status,
-            "applied_at": app.applied_at
+            "applied_at": app.applied_at,
         })
 
     return {
         "job_id": job_id,
-        "total_applications": len(application_list),
-        "applications": application_list
+        "total_applications": len(applications),
+        "applications": applications,
     }

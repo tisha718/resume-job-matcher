@@ -4,11 +4,12 @@ const API_BASE_URL = 'http://localhost:8001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-// --------------------------------------------------
-// REQUEST INTERCEPTOR – attach JWT token
-// --------------------------------------------------
+/* -------------------- REQUEST INTERCEPTOR -------------------- */
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -20,9 +21,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// --------------------------------------------------
-// RESPONSE INTERCEPTOR – handle auth errors
-// --------------------------------------------------
+/* -------------------- RESPONSE INTERCEPTOR -------------------- */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -39,11 +38,9 @@ api.interceptors.response.use(
   }
 );
 
-// ==================================================
-// AUTH APIs
-// ==================================================
+/* ==================== AUTH APIs ==================== */
 export const authAPI = {
-  // LOGIN → OAuth2PasswordRequestForm
+  // OAuth2PasswordRequestForm
   login: (formData) =>
     api.post('/login', formData, {
       headers: {
@@ -51,18 +48,14 @@ export const authAPI = {
       },
     }),
 
-  // SIGNUP → query params
+  // Query params signup
   signup: (params) =>
-    api.post('/signup', null, {
-      params,
-    }),
+    api.post('/signup', null, { params }),
 
   logout: () => api.post('/logout'),
 };
 
-// ==================================================
-// RESUME APIs (CANDIDATE)
-// ==================================================
+/* ==================== RESUME APIs ==================== */
 export const resumeAPI = {
   uploadResume: (file, userId) => {
     const formData = new FormData();
@@ -75,9 +68,7 @@ export const resumeAPI = {
   },
 
   getAllResumes: (userId) =>
-    api.get('/candidate/resumes', {
-      params: { user_id: userId },
-    }),
+    api.get('/candidate/resumes', { params: { user_id: userId } }),
 
   deleteResume: (resumeId, userId) =>
     api.delete(`/candidate/resume/${resumeId}`, {
@@ -100,9 +91,7 @@ export const resumeAPI = {
   },
 };
 
-// ==================================================
-// CANDIDATE APIs
-// ==================================================
+/* ==================== CANDIDATE APIs ==================== */
 export const candidateAPI = {
   getRecommendedJobs: (userId, resumeId, limit = 5) =>
     api.get('/candidate/recommended-jobs', {
@@ -124,7 +113,6 @@ export const candidateAPI = {
       params: { difficulty: difficulty.toLowerCase() },
     }),
 
-  // 🔑 Used in candidate profile
   getAppliedJobs: (userId) =>
     api.get('/candidate/applications', {
       params: { user_id: userId },
@@ -132,16 +120,13 @@ export const candidateAPI = {
 
   withdrawApplication: (applicationId) =>
     api.delete(`/candidate/${applicationId}/hard`),
-
-  // 🔑 FIXED: fetch actual job details
-  getJobDetails: (jobId) =>
-    api.get(`/candidate/jobs/${jobId}`),
 };
 
-// ==================================================
-// APPLICATION ANALYTICS APIs
-// ==================================================
+/* ==================== ANALYTICS APIs ==================== */
 export const applicationAPI = {
+  getOverallFitScoreDistribution: () =>
+    api.get('/analytics/overall-job-fit-score-distribution'),
+
   getApplicationsSummary: (jobId) =>
     api.get('/analytics/particular-job/applications-summary', {
       params: { job_id: jobId },
@@ -159,9 +144,7 @@ export const applicationAPI = {
     }),
 };
 
-// ==================================================
-// RECRUITER APIs
-// ==================================================
+/* ==================== RECRUITER APIs ==================== */
 export const recruiterAPI = {
   getJobs: () => api.get('/recruiter/jobs'),
 
@@ -169,14 +152,10 @@ export const recruiterAPI = {
     api.get(`/recruiter/jobs/by-recruiter/${recruiterId}`),
 
   createJob: (payload) =>
-    api.post('/recruiter/jobs/new', null, {
-      params: payload,
-    }),
+    api.post('/recruiter/jobs/new', null, { params: payload }),
 
   updateJob: (jobId, payload) =>
-    api.put(`/recruiter/jobs/${jobId}`, null, {
-      params: payload,
-    }),
+    api.put(`/recruiter/jobs/${jobId}`, null, { params: payload }),
 
   deleteJob: (jobId) =>
     api.delete(`/recruiter/jobs/delete/${jobId}`),
@@ -189,23 +168,6 @@ export const recruiterAPI = {
 
   generateQuestions: (jobId) =>
     api.post(`/recruiter/jobs/${jobId}/interview-questions`),
-};
-
-// ==================================================
-// USER APIs (NO /api PREFIX ❌)
-// ==================================================
-export const userAPI = {
-  getUserDetails: (userId) =>
-    api.get(`/users/${userId}`),
-
-  getBatchUserDetails: (userIds) =>
-    api.post('/users/batch', { user_ids: userIds }),
-
-  getUserProfile: () =>
-    api.get('/users/profile'),
-
-  updateUserProfile: (data) =>
-    api.put('/users/profile', data),
 };
 
 export default api;

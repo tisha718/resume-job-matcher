@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Briefcase, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { authAPI } from '../../services/api';
+import { jwtDecode } from 'jwt-decode';
 
 const Signup = () => {
   const [searchParams] = useSearchParams();
@@ -26,47 +27,23 @@ const Signup = () => {
     setError('');
   };
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
+const token = res.data.access_token;
+const decoded = jwtDecode(token);
 
-  if (formData.password !== formData.confirmPassword) {
-    setError('Passwords do not match');
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const res = await authAPI.signup({
-      firstname: formData.firstName,
-      lastname: formData.lastName,
-      email: formData.email,
-      password: formData.password,
-      role: formData.role,
-    });
-
-    const token = res.data.access_token;
-
-    const user = {
-      email: formData.email,
-      role: formData.role,
-      name: `${formData.firstName} ${formData.lastName}`,
-    };
-
-    login(user, token);
-
-    navigate(
-      user.role === 'candidate'
-        ? '/candidate/dashboard'
-        : '/recruiter/dashboard'
-    );
-  } catch (err) {
-    setError(err.response?.data?.detail || 'Signup failed');
-  } finally {
-    setLoading(false);
-  }
+const user = {
+  email: decoded.sub,
+  role: decoded.scope,
 };
+
+localStorage.setItem('token', token);
+login(user);
+
+navigate(
+  user.role === 'recruiter'
+    ? '/recruiter/dashboard'
+    : '/candidate/dashboard'
+);
+
 
 
   return (

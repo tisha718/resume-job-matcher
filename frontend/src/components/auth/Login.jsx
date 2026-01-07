@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Briefcase, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { authAPI } from '../../services/api';
+import { jwtDecode } from 'jwt-decode';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -16,35 +17,37 @@ const Login = () => {
     setError('');
   };
 
+
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
-  setLoading(true);
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
-  try {
-    const payload = new URLSearchParams();
-    payload.append('username', formData.email); // IMPORTANT: username, not email
-    payload.append('password', formData.password);
+    try {
+      const payload = new URLSearchParams();
+      payload.append('username', formData.email.trim().toLowerCase());
+      payload.append('password', formData.password);
 
-    const res = await authAPI.login(payload);
+      const res = await authAPI.login(payload);
 
-    const token = res.data.access_token;
+      const token = res.data.access_token;
 
-    const user = {
-      email: formData.email,
-      role: 'candidate', // backend controls role in token
-      name: formData.email.split('@')[0],
-    };
+      login(token); // AuthContext decodes role
 
-    login(user, token);
+      const decoded = jwtDecode(token);
 
-    navigate('/candidate/dashboard');
-  } catch (err) {
-    setError('Invalid email or password');
-  } finally {
-    setLoading(false);
-  }
-};
+      navigate(
+        decoded.scope === 'recruiter'
+          ? '/recruiter-dashboard'
+          : '/candidate/dashboard'
+      );
+    } catch (err) {
+      setError('Invalid email or password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
 
   return (

@@ -6,6 +6,9 @@ from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 load_dotenv()
 

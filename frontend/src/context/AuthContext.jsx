@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
@@ -8,19 +9,38 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Restore auth state from JWT
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
 
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      setToken(storedToken);
+    if (storedToken) {
+      try {
+        const decoded = jwtDecode(storedToken);
+
+        setUser({
+          email: decoded.sub,
+          role: decoded.scope,
+        });
+
+        setToken(storedToken);
+      } catch (err) {
+        localStorage.removeItem('token');
+        setUser(null);
+        setToken(null);
+      }
     }
+
     setLoading(false);
   }, []);
 
-  const login = (userData, accessToken) => {
-    localStorage.setItem('user', JSON.stringify(userData));
+  const login = (accessToken) => {
+    const decoded = jwtDecode(accessToken);
+
+    const userData = {
+      email: decoded.sub,
+      role: decoded.scope,
+    };
+
     localStorage.setItem('token', accessToken);
     setUser(userData);
     setToken(accessToken);
@@ -30,9 +50,8 @@ export const AuthProvider = ({ children }) => {
     try {
       await api.post('/logout');
     } catch (e) {
-      // token may already be expired – ignore
+      // ignore
     } finally {
-      localStorage.removeItem('user');
       localStorage.removeItem('token');
       setUser(null);
       setToken(null);
@@ -55,4 +74,10 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return ctx;
+};
