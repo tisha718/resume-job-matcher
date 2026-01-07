@@ -46,16 +46,10 @@ export const AuthProvider = ({ children }) => {
     setToken(accessToken);
   };
 
-  const logout = async () => {
-    try {
-      await api.post('/logout');
-    } catch (e) {
-      // ignore
-    } finally {
-      localStorage.removeItem('token');
-      setUser(null);
-      setToken(null);
-    }
+  const logout = () => {
+  localStorage.removeItem('token');
+  setUser(null);
+  setToken(null);
   };
 
   return (

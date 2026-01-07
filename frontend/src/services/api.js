@@ -29,10 +29,16 @@ api.interceptors.response.use(
       console.error('API Error:', error.response.data);
 
       if (error.response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+        console.warn('401 received – token may be invalid');
+
+        // DO NOT auto-logout during initial app load or signup
+        if (window.location.pathname !== '/login' &&
+            window.location.pathname !== '/signup') {
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }
       }
+
     }
     return Promise.reject(error);
   }
